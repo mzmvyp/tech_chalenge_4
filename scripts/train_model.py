@@ -26,6 +26,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 import numpy as np
 import pandas as pd
+import json
 from datetime import datetime
 
 # Imports do projeto
@@ -116,6 +117,39 @@ def main():
 
     # Salvar scaler
     preprocessor.save_scaler(config.get('model_paths', 'scaler_file'))
+
+    # Salvar configuração de features (CORREÇÃO OPUS - CRÍTICO!)
+    print("\n💾 Salvando configuração de features...")
+    feature_config = {
+        'features': df_features.columns.tolist(),
+        'target_column': 'Close',
+        'target_idx': df_features.columns.tolist().index('Close'),
+        'sequence_length': model_config['sequence_length'],
+        'use_vix': df_vix is not None,
+        'feature_engineering_config': {
+            'use_moving_averages': features_config.get('use_moving_averages', False),
+            'use_volume_features': True,
+            'use_volatility': True,
+            'use_momentum': True,
+            'use_returns': features_config.get('use_returns', True)
+        },
+        'data_info': {
+            'train_samples': data['split_info']['train_samples'],
+            'val_samples': data['split_info']['val_samples'],
+            'test_samples': data['split_info']['test_samples'],
+            'train_period': [str(data['split_info']['train_period'][0]),
+                           str(data['split_info']['train_period'][1])],
+            'val_period': [str(data['split_info']['val_period'][0]),
+                         str(data['split_info']['val_period'][1])],
+            'test_period': [str(data['split_info']['test_period'][0]),
+                          str(data['split_info']['test_period'][1])]
+        }
+    }
+
+    feature_config_path = Path(data_config['processed_data_path']) / 'feature_config.json'
+    with open(feature_config_path, 'w') as f:
+        json.dump(feature_config, f, indent=2)
+    print(f"✓ Configuração de features salva em: {feature_config_path}")
 
     # ============================================
     # 5. CRIAR MODELO

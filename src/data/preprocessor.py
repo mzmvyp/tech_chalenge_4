@@ -78,6 +78,8 @@ class TimeSeriesPreprocessor:
         # Scaler será fitado apenas no treino
         self.scaler = None
         self.feature_names = None
+        self.target_column = None  # Nome da coluna target
+        self.target_idx = None  # Índice da coluna target (CRÍTICO!)
         self.split_info = {}  # Guardar informações sobre o split
 
         print(f"⚙️  Preprocessador inicializado:")
@@ -272,6 +274,17 @@ class TimeSeriesPreprocessor:
             print(f"🎯 Coluna alvo: {target_column}")
 
         # ============================================
+        # PASSO 0: SALVAR INFORMAÇÕES DO TARGET
+        # ============================================
+        self.target_column = target_column
+        self.target_idx = df.columns.tolist().index(target_column)
+
+        if verbose:
+            print(f"\n🎯 Target configurado:")
+            print(f"   Coluna: {target_column}")
+            print(f"   Índice: {self.target_idx}")
+
+        # ============================================
         # PASSO 1: SPLIT TEMPORAL PRIMEIRO
         # ============================================
         df_train, df_val, df_test = self.temporal_split(df, verbose=verbose)
@@ -317,7 +330,8 @@ class TimeSeriesPreprocessor:
             'X_test': X_test,
             'y_test': y_test,
             'feature_names': self.feature_names,
-            'target_column': target_column,
+            'target_column': self.target_column,  # Atualizado
+            'target_idx': self.target_idx,  # NOVO - Índice do target
             'split_info': self.split_info,
         }
 
@@ -334,7 +348,7 @@ class TimeSeriesPreprocessor:
 
     def save_scaler(self, filepath: str = "models/scaler.pkl"):
         """
-        Salva o scaler treinado.
+        Salva o scaler treinado com metadados (CORREÇÃO OPUS).
 
         Args:
             filepath: Caminho para salvar o scaler
@@ -343,12 +357,23 @@ class TimeSeriesPreprocessor:
             raise ValueError("Scaler não foi treinado ainda!")
 
         Path(filepath).parent.mkdir(parents=True, exist_ok=True)
-        joblib.dump(self.scaler, filepath)
-        print(f"\n💾 Scaler salvo em: {filepath}")
+
+        # Salvar scaler com metadados (CORREÇÃO OPUS)
+        scaler_data = {
+            'scaler': self.scaler,
+            'feature_names': self.feature_names,
+            'target_column': self.target_column,
+            'target_idx': self.target_idx
+        }
+
+        joblib.dump(scaler_data, filepath)
+        print(f"\n💾 Scaler e metadados salvos em: {filepath}")
+        print(f"   Features: {len(self.feature_names) if self.feature_names else 0}")
+        print(f"   Target: {self.target_column} (índice {self.target_idx})")
 
     def load_scaler(self, filepath: str = "models/scaler.pkl"):
         """
-        Carrega um scaler salvo.
+        Carrega um scaler salvo com metadados (CORREÇÃO OPUS).
 
         Args:
             filepath: Caminho do scaler salvo
@@ -356,8 +381,22 @@ class TimeSeriesPreprocessor:
         if not Path(filepath).exists():
             raise FileNotFoundError(f"Scaler não encontrado: {filepath}")
 
-        self.scaler = joblib.load(filepath)
-        print(f"\n📂 Scaler carregado de: {filepath}")
+        scaler_data = joblib.load(filepath)
+
+        # Compatibilidade com versão antiga (CORREÇÃO OPUS)
+        if isinstance(scaler_data, dict):
+            self.scaler = scaler_data['scaler']
+            self.feature_names = scaler_data.get('feature_names')
+            self.target_column = scaler_data.get('target_column', 'Close')
+            self.target_idx = scaler_data.get('target_idx')
+            print(f"\n📂 Scaler e metadados carregados de: {filepath}")
+            print(f"   Features: {len(self.feature_names) if self.feature_names else 0}")
+            print(f"   Target: {self.target_column} (índice {self.target_idx})")
+        else:
+            # Versão antiga, só o scaler
+            self.scaler = scaler_data
+            print(f"\n📂 Scaler carregado de: {filepath} (versão antiga, sem metadados)")
+            print(f"   ⚠️ WARNING: Metadados não disponíveis. Re-treine o modelo.")
 
     def inverse_transform_target(self, y_scaled: np.ndarray, target_column: str = 'Close') -> np.ndarray:
         """
@@ -365,7 +404,7 @@ class TimeSeriesPreprocessor:
 
         Args:
             y_scaled: Array com valores normalizados
-            target_column: Nome da coluna alvo
+            target_column: Nome da coluna alvo (opcional se target_idx já está salvo)
 
         Returns:
             Array com valores na escala original
@@ -373,9 +412,18 @@ class TimeSeriesPreprocessor:
         if self.scaler is None:
             raise ValueError("Scaler não foi treinado!")
 
-        # Criar array com zeros exceto na coluna do target
-        target_idx = self.feature_names.index(target_column)
-        n_features = len(self.feature_names)
+        # Usar target_idx salvo ou buscar pelo nome (CORREÇÃO OPUS)
+        if self.target_idx is not None:
+            target_idx = self.target_idx
+        elif self.feature_names and target_column in self.feature_names:
+            target_idx = self.feature_names.index(target_column)
+        else:
+            # Fallback para posição padrão do Close em OHLCV
+            # NOTA: Isso é um fallback de segurança, mas não deveria ser necessário
+            target_idx = 3
+            print(f"⚠️ WARNING: Usando índice padrão {target_idx} para {target_column}")
+
+        n_features = len(self.feature_names) if self.feature_names else self.scaler.n_features_in_
 
         # Reshape se necessário
         if y_scaled.ndim == 1:

@@ -43,6 +43,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 from src.models.predictor import StockPredictor
 from src.data.preprocessor import TimeSeriesPreprocessor
 from src.data.feature_engineering import FeatureEngineer
+from src.monitoring.metrics import ModelMonitor  # CORREÇÃO OPUS
 
 
 # ============================================
@@ -78,6 +79,8 @@ class APIState:
         self.predictor: StockPredictor = None
         self.preprocessor: TimeSeriesPreprocessor = None
         self.feature_engineer: FeatureEngineer = None
+        self.monitor: ModelMonitor = None  # CORREÇÃO OPUS
+        self.feature_config: Dict[str, Any] = {}  # CORREÇÃO OPUS
         self.model_info: Dict[str, Any] = {}
         self.model_loaded: bool = False
 
@@ -98,19 +101,34 @@ class APIState:
                 with open(info_path, 'r') as f:
                     self.model_info = json.load(f)
 
+            # Carregar configuração de features (CORREÇÃO OPUS - CRÍTICO!)
+            feature_config_path = Path("data/processed/feature_config.json")
+            if feature_config_path.exists():
+                with open(feature_config_path, 'r') as f:
+                    self.feature_config = json.load(f)
+                print(f"✓ Configuração de features carregada: {len(self.feature_config.get('features', []))} features")
+            else:
+                print("⚠️ WARNING: feature_config.json não encontrado. API pode não funcionar corretamente.")
+                print("   Execute o treinamento primeiro: python scripts/train_model.py")
+
             # Inicializar feature engineer
             self.feature_engineer = FeatureEngineer()
 
             # Inicializar preprocessor (não precisa de dados, só para processamento)
+            sequence_length = self.feature_config.get('sequence_length', 60) if self.feature_config else 60
             self.preprocessor = TimeSeriesPreprocessor(
-                sequence_length=60,  # Padrão
+                sequence_length=sequence_length,
                 train_ratio=0.70,
                 val_ratio=0.15,
                 test_ratio=0.15
             )
 
+            # Inicializar monitor (CORREÇÃO OPUS)
+            self.monitor = ModelMonitor(log_dir="logs/monitoring")
+
             self.model_loaded = True
             print("✅ Modelo carregado com sucesso!")
+            print("✅ Monitoramento ativado!")
 
         except Exception as e:
             print(f"❌ Erro ao carregar modelo: {e}")
@@ -237,7 +255,8 @@ async def predict(request: PredictionRequest):
     """
     Faz uma predição do preço de fechamento para o próximo dia.
 
-    Requer os últimos 60 dias de dados (OHLCV).
+    CORREÇÃO OPUS: Requer os últimos 90+ dias de dados (OHLCV) para criar features.
+    Aplica as MESMAS features usadas no treinamento.
     """
     if not api_state.model_loaded:
         raise HTTPException(
@@ -245,14 +264,25 @@ async def predict(request: PredictionRequest):
             detail="Modelo não está carregado"
         )
 
+    import time
+    start_time = time.time()  # CORREÇÃO OPUS: Monitoramento
+
     try:
+        # Verificar quantidade mínima de dados (CORREÇÃO OPUS)
+        MIN_REQUIRED = 90  # 60 para sequência + 30 para features rolling máximo
+        if len(request.data) < MIN_REQUIRED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Mínimo de {MIN_REQUIRED} dias de dados necessários. Recebido: {len(request.data)}"
+            )
+
         # Converter dados para DataFrame
         data_dicts = [point.dict() for point in request.data]
         df = pd.DataFrame(data_dicts)
         df['date'] = pd.to_datetime(df['date'])
-        df = df.set_index('date')
+        df = df.set_index('date').sort_index()
 
-        # Renomear colunas para uppercase (esperado pelo modelo)
+        # Renomear colunas para uppercase
         df = df.rename(columns={
             'open': 'Open',
             'high': 'High',
@@ -261,32 +291,80 @@ async def predict(request: PredictionRequest):
             'volume': 'Volume'
         })
 
-        # Criar features (se necessário)
-        # TODO: Aplicar mesmas features usadas no treinamento
+        # Verificar se temos feature_config (CORREÇÃO OPUS - CRÍTICO!)
+        if not api_state.feature_config:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Configuração de features não encontrada. Execute o treinamento primeiro."
+            )
+
+        # Criar as MESMAS features usadas no treinamento (CORREÇÃO OPUS)
+        fe_config = api_state.feature_config['feature_engineering_config']
+        df_features = api_state.feature_engineer.create_all_features(
+            df_main=df,
+            df_vix=None,  # TODO: buscar VIX atual se necessário
+            use_moving_averages=fe_config.get('use_moving_averages', False),
+            use_volume_features=fe_config.get('use_volume_features', True),
+            use_volatility=fe_config.get('use_volatility', True),
+            use_momentum=fe_config.get('use_momentum', True),
+            use_returns=fe_config.get('use_returns', True)
+        )
+
+        # Verificar se temos features suficientes após criar rolling windows
+        sequence_length = api_state.feature_config.get('sequence_length', 60)
+        if len(df_features) < sequence_length:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Após criar features, apenas {len(df_features)} dias disponíveis. Mínimo: {sequence_length}"
+            )
+
+        # Garantir que temos as mesmas features do modelo (CORREÇÃO OPUS)
+        expected_features = api_state.feature_config['features']
+
+        # Adicionar features faltantes com valores padrão
+        for feat in expected_features:
+            if feat not in df_features.columns:
+                if feat == 'VIX':
+                    df_features[feat] = 20.0  # VIX médio histórico
+                else:
+                    df_features[feat] = 0.0
+
+        # Reordenar colunas para match com o treinamento (CORREÇÃO OPUS - CRÍTICO!)
+        df_features = df_features[expected_features]
 
         # Normalizar dados
-        data_scaled = api_state.predictor.scaler.transform(df.values)
+        data_scaled = api_state.predictor.scaler.transform(df_features.values)
 
-        # Pegar últimos 60 dias
-        if len(data_scaled) > 60:
-            sequence = data_scaled[-60:]
-        else:
-            sequence = data_scaled
+        # Pegar últimos N dias para formar a sequência
+        sequence = data_scaled[-sequence_length:]
 
         # Fazer predição
         prediction = api_state.predictor.predict_single(sequence, return_scaled=False)
 
-        # Calcular intervalo de confiança (opcional)
-        # TODO: Implementar cálculo de confiança
+        # Calcular intervalo de confiança baseado em volatilidade histórica
+        recent_volatility = df_features['Close'].pct_change().std() * np.sqrt(1)  # 1 dia
+        confidence_interval = float(prediction) * recent_volatility * 1.96
+
+        # Registrar no monitoramento (CORREÇÃO OPUS)
+        inference_time = time.time() - start_time
+        if api_state.monitor:
+            api_state.monitor.log_prediction(
+                input_shape=sequence.shape,
+                prediction=float(prediction),
+                inference_time=inference_time,
+                timestamp=datetime.utcnow()
+            )
 
         return PredictionResponse(
             prediction=float(prediction),
-            confidence_lower=None,
-            confidence_upper=None,
+            confidence_lower=float(prediction - confidence_interval),
+            confidence_upper=float(prediction + confidence_interval),
             model_version="1.0.0",
             timestamp=datetime.utcnow().isoformat() + "Z"
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -350,6 +428,64 @@ async def predict_batch(request: BatchPredictionRequest):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Erro ao processar predições em batch: {str(e)}"
+        )
+
+
+# ============================================
+# ENDPOINTS DE MONITORAMENTO (CORREÇÃO OPUS)
+# ============================================
+
+@app.get("/monitoring/stats", tags=["Monitoring"])
+async def get_monitoring_stats(date: str = None):
+    """
+    Obtém estatísticas de monitoramento.
+
+    Args:
+        date: Data no formato YYYY-MM-DD (opcional, padrão: hoje)
+
+    Returns:
+        Estatísticas de predições do dia
+    """
+    if not api_state.monitor:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Monitoramento não está habilitado"
+        )
+
+    try:
+        stats = api_state.monitor.get_daily_stats(date)
+        return stats
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao obter estatísticas: {str(e)}"
+        )
+
+
+@app.get("/monitoring/hourly", tags=["Monitoring"])
+async def get_hourly_stats(date: str = None):
+    """
+    Obtém estatísticas horárias de monitoramento.
+
+    Args:
+        date: Data no formato YYYY-MM-DD (opcional, padrão: hoje)
+
+    Returns:
+        Estatísticas de predições por hora
+    """
+    if not api_state.monitor:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Monitoramento não está habilitado"
+        )
+
+    try:
+        stats = api_state.monitor.get_hourly_stats(date)
+        return stats
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao obter estatísticas horárias: {str(e)}"
         )
 
 
