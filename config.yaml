@@ -1,0 +1,137 @@
+# ============================================
+# CONFIGURAÇÕES DO PROJETO LSTM STOCK PREDICTION
+# ============================================
+
+# Dados
+data:
+  # Símbolo do ativo principal
+  symbol: "^GSPC"  # S&P 500
+
+  # Símbolo do VIX (volatilidade)
+  vix_symbol: "^VIX"
+
+  # Período de dados
+  start_date: "2019-01-01"
+  end_date: "2024-11-01"
+  interval: "1d"  # Diário
+
+  # Split temporal (sem shuffle!)
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+
+  # Caminhos
+  raw_data_path: "data/raw"
+  processed_data_path: "data/processed"
+
+# Features
+features:
+  # Features básicas (OHLCV)
+  use_ohlcv: true
+
+  # VIX (volatilidade)
+  use_vix: true
+
+  # Returns
+  use_returns: true
+
+  # Médias móveis (opcional)
+  use_moving_averages: false
+  ma_windows: [5, 10, 20, 50]
+
+  # Sentiment analysis (opcional - requer mais recursos)
+  use_sentiment: false
+
+# Modelo LSTM
+model:
+  # Arquitetura
+  sequence_length: 60  # Usar 60 dias para prever próximo
+
+  lstm_layers:
+    - units: 128
+      return_sequences: true
+      dropout: 0.2
+    - units: 64
+      return_sequences: true
+      dropout: 0.2
+    - units: 32
+      return_sequences: false
+      dropout: 0.2
+
+  dense_layers:
+    - units: 16
+      activation: "relu"
+    - units: 1
+      activation: null  # Linear para regressão
+
+  # Compilação
+  optimizer: "adam"
+  learning_rate: 0.001
+  loss: "mse"
+  metrics: ["mae"]
+
+# Treinamento
+training:
+  batch_size: 32
+  epochs: 100
+  validation_split: 0.0  # Já temos validação separada
+
+  # Early Stopping
+  early_stopping:
+    monitor: "val_loss"
+    patience: 15
+    restore_best_weights: true
+    min_delta: 0.0001
+
+  # Model Checkpoint
+  model_checkpoint:
+    monitor: "val_loss"
+    save_best_only: true
+    mode: "min"
+
+  # ReduceLROnPlateau
+  reduce_lr:
+    monitor: "val_loss"
+    factor: 0.5
+    patience: 5
+    min_lr: 0.00001
+
+# Paths do modelo
+model_paths:
+  model_file: "models/lstm_model.h5"
+  scaler_file: "models/scaler.pkl"
+  metadata_file: "models/model_info.json"
+
+# API
+api:
+  title: "LSTM Stock Prediction API"
+  description: "API para predição de preços de ações usando LSTM"
+  version: "1.0.0"
+  host: "0.0.0.0"
+  port: 8000
+  reload: false  # true apenas em desenvolvimento
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> - <level>{message}</level>"
+  log_file: "logs/app.log"
+
+# Seeds para reprodutibilidade
+random_state:
+  numpy_seed: 42
+  tensorflow_seed: 42
+  python_seed: 42
+
+# Validações anti-leakage
+validation:
+  # Verificar que não há data leakage
+  check_temporal_order: true
+  check_no_future_data: true
+
+  # Baseline para comparação
+  compare_with_baseline: true
+  baseline_methods: ["naive", "moving_average"]
+
+  # Threshold de performance suspeita (pode indicar leakage)
+  max_acceptable_r2: 0.95  # R² > 0.95 é suspeito em séries temporais financeiras

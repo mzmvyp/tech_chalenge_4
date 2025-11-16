@@ -1,0 +1,58 @@
+# ============================================
+# Docker Compose para LSTM Stock Prediction
+# ============================================
+
+version: '3.8'
+
+services:
+  # Serviço da API
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: lstm_stock_api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Montar modelos salvos (para persistência)
+      - ./models:/app/models
+      # Montar logs
+      - ./logs:/app/logs
+      # Montar outputs
+      - ./outputs:/app/outputs
+      # Montar dados (opcional)
+      - ./data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TF_CPP_MIN_LOG_LEVEL=2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Serviço para treinamento (opcional - executar manualmente)
+  # Descomente para usar
+  # trainer:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/Dockerfile
+  #   container_name: lstm_trainer
+  #   volumes:
+  #     - ./models:/app/models
+  #     - ./data:/app/data
+  #     - ./outputs:/app/outputs
+  #     - ./logs:/app/logs
+  #   command: ["python", "scripts/train_model.py"]
+  #   environment:
+  #     - PYTHONUNBUFFERED=1
+  #     - TF_CPP_MIN_LOG_LEVEL=2
+
+# Volumes nomeados (opcional)
+volumes:
+  models:
+  data:
+  logs:
+  outputs:
