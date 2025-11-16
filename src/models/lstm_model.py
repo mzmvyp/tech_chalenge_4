@@ -18,6 +18,7 @@ from tensorflow import keras
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.regularizers import l1_l2  # CORREÇÃO: Adicionar regularização
 from typing import Dict, List, Any, Optional
 import numpy as np
 
@@ -88,18 +89,23 @@ class LSTMStockPredictor:
             return_sequences = layer_config.get('return_sequences', False)
             dropout = layer_config.get('dropout', 0.0)
 
+            # CORREÇÃO: Adicionar regularização L1/L2 para prevenir overfitting
             # Primeira camada precisa especificar input_shape
             if i == 0:
                 model.add(LSTM(
                     units=units,
                     return_sequences=return_sequences,
                     input_shape=(self.sequence_length, self.n_features),
+                    kernel_regularizer=l1_l2(l1=0.001, l2=0.001),
+                    recurrent_regularizer=l1_l2(l1=0.001, l2=0.001),
                     name=f'lstm_{i+1}'
                 ))
             else:
                 model.add(LSTM(
                     units=units,
                     return_sequences=return_sequences,
+                    kernel_regularizer=l1_l2(l1=0.001, l2=0.001),
+                    recurrent_regularizer=l1_l2(l1=0.001, l2=0.001),
                     name=f'lstm_{i+1}'
                 ))
 

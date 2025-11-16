@@ -44,22 +44,22 @@ features:
 
 # Modelo LSTM
 model:
-  # Arquitetura
+  # Arquitetura SIMPLIFICADA (correção de overfitting)
+  # Reduzido de 3 para 2 camadas LSTM
+  # Reduzido unidades: 128→64→32 para 64→32
   sequence_length: 60  # Usar 60 dias para prever próximo
 
   lstm_layers:
-    - units: 128
+    - units: 64        # Reduzido de 128
       return_sequences: true
       dropout: 0.2
-    - units: 64
-      return_sequences: true
-      dropout: 0.2
-    - units: 32
+    - units: 32        # Mantido
       return_sequences: false
       dropout: 0.2
+    # Removida 3ª camada LSTM (era excessiva)
 
   dense_layers:
-    - units: 16
+    - units: 8         # Reduzido de 16
       activation: "relu"
     - units: 1
       activation: null  # Linear para regressão

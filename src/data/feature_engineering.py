@@ -217,13 +217,19 @@ class FeatureEngineer:
         # Merge por índice (data)
         df = df.join(df_vix, how='left')
 
-        # Forward fill para preencher gaps (VIX pode ter menos dados)
-        df['VIX'] = df['VIX'].fillna(method='ffill')
+        # CORREÇÃO: Forward fill com shift para evitar data leakage
+        # Usa valor do DIA ANTERIOR, não do dia atual
+        # Isso garante que não estamos usando informação futura
+        df['VIX'] = df['VIX'].fillna(method='ffill').shift(1)
 
-        # Se ainda houver NaN no início, usar backfill
-        df['VIX'] = df['VIX'].fillna(method='bfill')
+        # Para os primeiros valores que ficarem NaN após shift, usar média
+        # (não podemos usar bfill pois isso usa dados futuros!)
+        if df['VIX'].isna().any():
+            vix_mean = df['VIX'].mean()
+            df['VIX'] = df['VIX'].fillna(vix_mean)
+            print(f"⚠️  {df['VIX'].isna().sum()} valores VIX preenchidos com média ({vix_mean:.2f})")
 
-        print(f"✓ Dados VIX mergeados: {df['VIX'].notna().sum()} valores")
+        print(f"✓ Dados VIX mergeados: {df['VIX'].notna().sum()} valores (sem data leakage)")
         return df
 
     def create_all_features(

@@ -33,6 +33,7 @@ from datetime import datetime
 from src.config import get_config
 from src.data.data_loader import DataLoader
 from src.data.feature_engineering import FeatureEngineer
+from src.data.feature_selector import FeatureSelector  # CORREÇÃO: Feature selection
 from src.data.preprocessor import TimeSeriesPreprocessor
 from src.models.lstm_model import create_model_from_config
 from src.models.trainer import ModelTrainer
@@ -95,10 +96,20 @@ def main():
         use_returns=features_config.get('use_returns', True)
     )
 
-    # Salvar features
+    # Salvar features ANTES da seleção
+    features_path_full = Path(data_config['processed_data_path']) / 'features_full.csv'
+    df_features.to_csv(features_path_full)
+    print(f"\n💾 Features completas salvas em: {features_path_full}")
+
+    # CORREÇÃO: Aplicar seleção de features para reduzir multicolinearidade
+    print("\n🔍 PASSO 3.5: Selecionando features (anti-multicolinearidade)...")
+    selector = FeatureSelector(correlation_threshold=0.8)
+    df_features = selector.select_features(df_features, verbose=True)
+
+    # Salvar features selecionadas
     features_path = Path(data_config['processed_data_path']) / 'features.csv'
     df_features.to_csv(features_path)
-    print(f"\n💾 Features salvas em: {features_path}")
+    print(f"\n💾 Features selecionadas salvas em: {features_path}")
 
     # ============================================
     # 4. PREPROCESSAMENTO (COM ANTI-LEAKAGE!)
