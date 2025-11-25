@@ -152,13 +152,13 @@ online_learning:
   enabled: true
   
   # Retreinar quando tiver N novos exemplos
-  retrain_threshold: 50
+  retrain_threshold: 100  # Aumentado: mais dados antes de retreinar
   
   # Épocas para fine-tuning (menos que treino inicial)
-  fine_tune_epochs: 5
+  fine_tune_epochs: 3  # Reduzido: mais conservador
   
   # Learning rate para fine-tuning (menor que treino inicial)
-  fine_tune_lr: 0.0001
+  fine_tune_lr: 0.00005  # Reduzido: mais conservador para evitar overfitting
   
   # Caminho do buffer de dados
   buffer_path: "data/processed/online_learning_buffer.csv"

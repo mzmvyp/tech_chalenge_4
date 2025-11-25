@@ -198,35 +198,73 @@ class OnlineLearner:
             print("🔄 RETREINAMENTO INCREMENTAL (Online Learning)")
             print("="*60)
         
-        # Se não foram passados dados, usar buffer
+        # Se não foram passados dados, preparar do buffer
         if X_new is None or y_new is None:
             if len(self.new_data_buffer) == 0:
                 print("⚠️  Buffer vazio, nada para retreinar")
                 return
             
-            # Preparar dados do buffer
-            # Por enquanto, apenas limpar buffer
-            # TODO: Implementar preparação completa quando tiver pipeline de dados
-            print(f"📊 Buffer tem {len(self.new_data_buffer)} novos exemplos")
-            print("⚠️  Para retreinar, precisa passar X_new e y_new")
-            print("   Ou implementar preparação completa do buffer")
+            print(f"📊 Preparando {len(self.new_data_buffer)} exemplos do buffer para retreinar...")
             
-            # Limpar buffer após processar
-            self.new_data_buffer = []
-            print("✓ Buffer processado e limpo")
-            return
+            # Preparar sequências e targets do buffer
+            X_buffer = []
+            y_buffer = []
+            
+            for feedback in self.new_data_buffer:
+                # Extrair sequência de features
+                if isinstance(feedback['features'], pd.DataFrame):
+                    seq_features = feedback['features']
+                    
+                    # Normalizar sequência
+                    seq_array = self.scaler.transform(seq_features.values)
+                    X_buffer.append(seq_array)
+                    
+                    # Target (Return)
+                    y_buffer.append(feedback['actual_return'])
+            
+            if len(X_buffer) == 0:
+                print("⚠️  Nenhuma sequência válida no buffer")
+                self.new_data_buffer = []
+                return
+            
+            # Converter para arrays numpy
+            X_new = np.array(X_buffer)
+            y_new = np.array(y_buffer)
+            
+            print(f"✓ Preparados {len(X_new)} sequências para retreinar")
         
         # Fine-tuning com novos dados
         print(f"📊 Retreinando com {len(X_new)} novos exemplos...")
         print(f"   Fine-tuning: {self.fine_tune_epochs} épocas, lr={self.fine_tune_lr}")
         
+        # Validação: se tiver poucos dados, usar menos épocas
+        actual_epochs = self.fine_tune_epochs
+        if len(X_new) < 20:
+            actual_epochs = min(3, self.fine_tune_epochs)
+            print(f"   ⚠️  Poucos dados ({len(X_new)}), reduzindo para {actual_epochs} épocas")
+        
+        # Treinar com early stopping para evitar overfitting
+        from tensorflow.keras.callbacks import EarlyStopping
+        
+        callbacks = []
+        if len(X_new) > 10:
+            # Early stopping apenas se tiver dados suficientes para validação
+            early_stop = EarlyStopping(
+                monitor='val_loss' if len(X_new) > 20 else 'loss',
+                patience=2,
+                restore_best_weights=True,
+                verbose=0
+            )
+            callbacks.append(early_stop)
+        
         # Treinar
         history = self.model.fit(
             X_new, y_new,
-            epochs=self.fine_tune_epochs,
-            batch_size=min(32, len(X_new)),
+            epochs=actual_epochs,
+            batch_size=min(16, len(X_new)),  # Batch menor para poucos dados
             verbose=1 if verbose else 0,
-            validation_split=0.2 if len(X_new) > 10 else 0.0
+            validation_split=0.2 if len(X_new) > 20 else 0.0,
+            callbacks=callbacks
         )
         
         # Salvar modelo atualizado
