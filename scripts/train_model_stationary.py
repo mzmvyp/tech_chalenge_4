@@ -74,8 +74,9 @@ def main():
     
     df_main, df_vix = loader.load_all_data()
     
-    # Guardar Close original para conversão depois
+    # Guardar Close original e índices para conversão depois
     close_series = df_main['Close'].copy()
+    original_index = df_main.index.copy()
     
     # ============================================
     # 3. FEATURE ENGINEERING ESTACIONÁRIO
@@ -84,6 +85,15 @@ def main():
     print("   (Removendo Close, High, Low, Open)")
     
     df_features = create_stationary_features(df_main, df_vix)
+    
+    # Manter índice original para alinhamento (após remoção de NaN)
+    # O create_stationary_features remove linhas, então precisamos alinhar índices
+    if len(df_features) < len(original_index):
+        # Pegar índices correspondentes aos dados que sobraram
+        # Assumir que as primeiras linhas foram removidas (NaN de rolling windows)
+        df_features.index = original_index[len(original_index) - len(df_features):]
+    else:
+        df_features.index = original_index[:len(df_features)]
     
     print(f"\n📊 Features estacionárias criadas: {df_features.shape}")
     print(f"   Colunas: {list(df_features.columns)}")
@@ -154,28 +164,40 @@ def main():
     y_val_pred_return = preprocessor.inverse_transform_target(y_val_pred_return, 'Return')
     
     # Converter Return → Close para métricas
-    # Pegar Close dos dados originais correspondentes
-    # As sequências começam após sequence_length, então precisamos alinhar
+    # Usar índices reais do DataFrame (não date_range, pois dados financeiros não têm todos os dias)
     
-    # Índices reais no dataset original
+    # Pegar índices do conjunto de validação
     val_start_date = pd.to_datetime(data['split_info']['val_period'][0])
     val_end_date = pd.to_datetime(data['split_info']['val_period'][1])
     
-    # Close real: valores correspondentes às predições
-    # As sequências começam em val_start_date + sequence_length dias
-    val_start_real = val_start_date + pd.Timedelta(days=model_config['sequence_length'])
-    val_close_real = close_series.loc[val_start_real:val_end_date].values
+    # Filtrar índices do DataFrame original que estão no período de validação
+    val_mask = (df_features.index >= val_start_date) & (df_features.index <= val_end_date)
+    val_indices = df_features.index[val_mask]
     
-    # Close predito: usar último Close conhecido antes de cada predição
-    # Para cada predição, usar o Close do dia anterior
-    val_close_last = close_series.loc[val_start_real - pd.Timedelta(days=1):val_end_date - pd.Timedelta(days=1)].values
-    if len(val_close_last) != len(y_val_pred_return):
-        # Ajustar se houver diferença de tamanho
-        min_len = min(len(val_close_last), len(y_val_pred_return))
-        val_close_last = val_close_last[:min_len]
-        y_val_pred_return = y_val_pred_return[:min_len]
-        val_close_real = val_close_real[:min_len]
+    # As sequências começam após sequence_length, então pular os primeiros sequence_length índices
+    val_pred_indices = val_indices[model_config['sequence_length']:]
     
+    # Ajustar tamanho se necessário
+    min_len = min(len(val_pred_indices), len(y_val_pred_return))
+    val_pred_indices = val_pred_indices[:min_len]
+    y_val_pred_return = y_val_pred_return[:min_len]
+    
+    # Close real: valores correspondentes às datas das predições
+    val_close_real = close_series.loc[val_pred_indices].values
+    
+    # Close predito: usar último Close conhecido (índice anterior a cada predição)
+    # Encontrar índices anteriores no DataFrame original
+    val_close_last = []
+    for idx in val_pred_indices:
+        # Encontrar índice anterior no close_series
+        prev_idx = close_series.index[close_series.index < idx]
+        if len(prev_idx) > 0:
+            val_close_last.append(close_series.loc[prev_idx[-1]])
+        else:
+            # Fallback: usar primeiro valor disponível
+            val_close_last.append(close_series.iloc[0])
+    
+    val_close_last = np.array(val_close_last)
     val_close_pred = val_close_last * (1 + y_val_pred_return)
     
     # Métricas em Close
@@ -196,16 +218,31 @@ def main():
     test_start_date = pd.to_datetime(data['split_info']['test_period'][0])
     test_end_date = pd.to_datetime(data['split_info']['test_period'][1])
     
-    test_start_real = test_start_date + pd.Timedelta(days=model_config['sequence_length'])
-    test_close_real = close_series.loc[test_start_real:test_end_date].values
+    # Filtrar índices do DataFrame original que estão no período de teste
+    test_mask = (df_features.index >= test_start_date) & (df_features.index <= test_end_date)
+    test_indices = df_features.index[test_mask]
     
-    test_close_last = close_series.loc[test_start_real - pd.Timedelta(days=1):test_end_date - pd.Timedelta(days=1)].values
-    if len(test_close_last) != len(y_test_pred_return):
-        min_len = min(len(test_close_last), len(y_test_pred_return))
-        test_close_last = test_close_last[:min_len]
-        y_test_pred_return = y_test_pred_return[:min_len]
-        test_close_real = test_close_real[:min_len]
+    # As sequências começam após sequence_length
+    test_pred_indices = test_indices[model_config['sequence_length']:]
     
+    # Ajustar tamanho se necessário
+    min_len = min(len(test_pred_indices), len(y_test_pred_return))
+    test_pred_indices = test_pred_indices[:min_len]
+    y_test_pred_return = y_test_pred_return[:min_len]
+    
+    # Close real
+    test_close_real = close_series.loc[test_pred_indices].values
+    
+    # Close predito: usar último Close conhecido
+    test_close_last = []
+    for idx in test_pred_indices:
+        prev_idx = close_series.index[close_series.index < idx]
+        if len(prev_idx) > 0:
+            test_close_last.append(close_series.loc[prev_idx[-1]])
+        else:
+            test_close_last.append(close_series.iloc[0])
+    
+    test_close_last = np.array(test_close_last)
     test_close_pred = test_close_last * (1 + y_test_pred_return)
     
     # Métricas em Close
