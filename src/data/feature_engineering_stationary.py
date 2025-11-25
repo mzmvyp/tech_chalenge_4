@@ -119,13 +119,16 @@ def create_stationary_features(
     # Remover infinitos
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
     
-    # Remover NaN
+    # Remover NaN (mantém índice original)
     initial_len = len(df)
     df.dropna(inplace=True)
     removed = initial_len - len(df)
     
     if removed > 0:
         print(f"⚠️  Removidas {removed} linhas com NaN após feature engineering")
+    
+    # IMPORTANTE: O índice é preservado automaticamente pelo dropna()
+    # Isso permite alinhamento correto com close_series depois
     
     return df
 
