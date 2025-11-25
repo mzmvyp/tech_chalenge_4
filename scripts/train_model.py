@@ -87,7 +87,16 @@ def main():
     print("\n🔨 PASSO 3: Criando features ESTACIONÁRIAS...")
     print("   (Removendo Close, High, Low, Open)")
     
-    df_features = create_stationary_features(df_main, df_vix)
+    # Obter configuração de features
+    full_config = config.config
+    feature_config = full_config.get('features', {})
+    
+    df_features = create_stationary_features(
+        df_main, 
+        df_vix,
+        use_candlestick_patterns=feature_config.get('use_candlestick_patterns', True),
+        use_technical_indicators=feature_config.get('use_technical_indicators', True)
+    )
     
     # O índice já está preservado pelo dropna() no create_stationary_features
     # Mas precisamos garantir que close_series tenha os mesmos índices

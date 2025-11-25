@@ -5,6 +5,8 @@ Feature Engineering - Versão com Apenas Features Estacionárias
 Esta versão cria features APENAS estacionárias, removendo Close/High/Low/Open
 que são não-estacionárias e causam problemas no modelo LSTM.
 
+NOVA: Agora inclui padrões de candles e indicadores técnicos!
+
 Autor: Tech Challenge - Fase 04
 Data: 2025-11-25
 """
@@ -16,25 +18,51 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
+# Importar módulos de padrões e indicadores
+try:
+    from src.data.candlestick_patterns import detect_candlestick_patterns, detect_multi_candle_patterns
+    from src.data.technical_indicators import add_all_technical_indicators
+    HAS_PATTERNS = True
+except ImportError:
+    HAS_PATTERNS = False
+    print("⚠️  Módulos de padrões de candles e indicadores não encontrados")
+
 
 def create_stationary_features(
     df_main: pd.DataFrame,
-    df_vix: Optional[pd.DataFrame] = None
+    df_vix: Optional[pd.DataFrame] = None,
+    use_candlestick_patterns: bool = True,
+    use_technical_indicators: bool = True
 ) -> pd.DataFrame:
     """
     Cria features APENAS estacionárias para o modelo.
     
     Remove: Close, High, Low, Open (não-estacionárias)
     Mantém: Return, Volatility, Momentum, Volume features, VIX
+    NOVO: Padrões de candles e indicadores técnicos!
     
     Args:
         df_main: DataFrame principal com OHLCV
         df_vix: DataFrame com VIX (opcional)
+        use_candlestick_patterns: Se True, adiciona padrões de candles
+        use_technical_indicators: Se True, adiciona indicadores técnicos
     
     Returns:
         DataFrame com apenas features estacionárias
     """
     df = df_main.copy()
+    
+    # ============================================
+    # 0. PADRÕES DE CANDLES E INDICADORES (ANTES DE REMOVER OHLC)
+    # ============================================
+    if use_candlestick_patterns and HAS_PATTERNS:
+        print("   Detectando padroes de candles...")
+        df = detect_candlestick_patterns(df)
+        df = detect_multi_candle_patterns(df, lookback=3)
+        print(f"   ✓ Padroes de candles adicionados")
+    
+    if use_technical_indicators and HAS_PATTERNS:
+        df = add_all_technical_indicators(df)
     
     # ============================================
     # 1. RETURNS (estacionário)
@@ -108,9 +136,21 @@ def create_stationary_features(
     # ============================================
     # 6. REMOVER FEATURES NÃO-ESTACIONÁRIAS
     # ============================================
+    # IMPORTANTE: Remover OHLC mas MANTER indicadores e padrões que foram calculados
     non_stationary = ['Close', 'High', 'Low', 'Open']
+    
+    # Manter colunas de indicadores e padrões mesmo que usem OHLC no nome
+    # (elas já foram calculadas e são estacionárias)
+    pattern_keywords = ['Candle_', 'Pattern_', 'RSI', 'MACD', 'BB_', 'Stochastic', 
+                        'ATR', 'ADX', 'DI_', 'Return', 'Volatility', 'Momentum', 
+                        'Volume', 'VIX']
+    
+    # Manter colunas que contêm qualquer uma das palavras-chave
+    cols_to_keep = [c for c in df.columns if any(keyword in c for keyword in pattern_keywords)]
+    
+    # Remover apenas OHLC básicos, não os indicadores
     for col in non_stationary:
-        if col in df.columns:
+        if col in df.columns and col not in cols_to_keep:
             df = df.drop(columns=[col])
     
     # ============================================

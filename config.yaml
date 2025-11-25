@@ -35,6 +35,12 @@ features:
   # Returns
   use_returns: true
 
+  # Padrões de Candles (NOVO!)
+  use_candlestick_patterns: true  # Hammer, Doji, Engulfing, etc.
+
+  # Indicadores Técnicos (NOVO!)
+  use_technical_indicators: true  # RSI, MACD, Bollinger Bands, etc.
+
   # Médias móveis (opcional)
   use_moving_averages: false
   ma_windows: [5, 10, 20, 50]
@@ -49,34 +55,34 @@ model:
   sequence_length: 75  # Otimizado: balance entre contexto e eficiência
 
   lstm_layers:
-    - units: 128       # Aumentado: mais capacidade
+    - units: 96        # Balanceado: capacidade sem overfitting
       return_sequences: true
-      dropout: 0.25    # Otimizado: regularização balanceada
+      dropout: 0.3     # Aumentado: mais regularização
       batch_normalization: true
-    - units: 64        # Aumentado
+    - units: 48        # Balanceado
       return_sequences: true
-      dropout: 0.25
+      dropout: 0.3     # Aumentado: mais regularização
       batch_normalization: true
-    - units: 32        # Aumentado: camada final
+    - units: 24        # Balanceado: camada final
       return_sequences: false
-      dropout: 0.25
+      dropout: 0.3     # Aumentado: mais regularização
       batch_normalization: true
 
   dense_layers:
-    - units: 32        # Aumentado: mais capacidade
+    - units: 24        # Balanceado
       activation: "relu"
-      dropout: 0.15    # Otimizado
+      dropout: 0.2     # Aumentado: mais regularização
       batch_normalization: true
-    - units: 16        # Aumentado
+    - units: 12        # Balanceado
       activation: "relu"
-      dropout: 0.15
+      dropout: 0.2     # Aumentado: mais regularização
       batch_normalization: false
     - units: 1
       activation: null  # Linear para regressão
 
   # Compilação
   optimizer: "adam"
-  learning_rate: 0.0003  # Otimizado: mais estável para Return prediction
+  learning_rate: 0.0002  # Reduzido: mais conservador para evitar overfitting
   loss: "mse"
   metrics: ["mae"]
 
