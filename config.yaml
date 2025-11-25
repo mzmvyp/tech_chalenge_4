@@ -49,25 +49,25 @@ model:
   sequence_length: 75  # Otimizado: balance entre contexto e eficiência
 
   lstm_layers:
-    - units: 96        # Otimizado: balance entre capacidade e overfitting
+    - units: 128       # Aumentado: mais capacidade
       return_sequences: true
       dropout: 0.25    # Otimizado: regularização balanceada
       batch_normalization: true
-    - units: 48        # Otimizado
+    - units: 64        # Aumentado
       return_sequences: true
       dropout: 0.25
       batch_normalization: true
-    - units: 24        # Otimizado: camada final
+    - units: 32        # Aumentado: camada final
       return_sequences: false
       dropout: 0.25
       batch_normalization: true
 
   dense_layers:
-    - units: 24        # Otimizado: balanceado
+    - units: 32        # Aumentado: mais capacidade
       activation: "relu"
       dropout: 0.15    # Otimizado
       batch_normalization: true
-    - units: 12        # Otimizado
+    - units: 16        # Aumentado
       activation: "relu"
       dropout: 0.15
       batch_normalization: false
@@ -152,13 +152,20 @@ online_learning:
   enabled: true
   
   # Retreinar quando tiver N novos exemplos
-  retrain_threshold: 100  # Aumentado: mais dados antes de retreinar
+  retrain_threshold: 200  # Aumentado: mais dados antes de retreinar (melhor generalização)
   
-  # Épocas para fine-tuning (menos que treino inicial)
-  fine_tune_epochs: 3  # Reduzido: mais conservador
+  # Épocas para fine-tuning (seguindo padrão do treinamento inicial)
+  fine_tune_epochs: 50  # Aumentado: seguir mesmo padrão do treinamento inicial
   
-  # Learning rate para fine-tuning (menor que treino inicial)
-  fine_tune_lr: 0.00005  # Reduzido: mais conservador para evitar overfitting
+  # Learning rate para fine-tuning (muito menor que treino inicial)
+  fine_tune_lr: 0.00001  # Muito conservador: 10x menor que treino inicial
+  
+  # Usar mesmos callbacks do treinamento inicial
+  use_same_callbacks: true
+  
+  # Validar performance antes de salvar
+  validate_before_save: true
+  min_improvement: 0.0  # Aceitar se não piorar (0.0) ou exigir melhoria (>0)
   
   # Caminho do buffer de dados
   buffer_path: "data/processed/online_learning_buffer.csv"

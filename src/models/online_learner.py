@@ -37,9 +37,9 @@ class OnlineLearner:
         model_path: str = "models/lstm_model.h5",
         scaler_path: str = "models/scaler.pkl",
         data_buffer_path: str = "data/processed/online_learning_buffer.csv",
-        retrain_threshold: int = 50,  # Retreinar quando tiver 50 novos exemplos
-        fine_tune_epochs: int = 5,
-        fine_tune_lr: float = 0.0001
+        retrain_threshold: int = 200,  # Retreinar quando tiver 200 novos exemplos
+        fine_tune_epochs: int = 50,  # Seguir padrão do treinamento inicial
+        fine_tune_lr: float = 0.00001  # Muito conservador: 10x menor que treino inicial
     ):
         """
         Inicializa o sistema de online learning.
@@ -233,43 +233,120 @@ class OnlineLearner:
             
             print(f"✓ Preparados {len(X_new)} sequências para retreinar")
         
-        # Fine-tuning com novos dados
+        # Fine-tuning com novos dados - SEGUINDO MESMO PADRÃO DO TREINAMENTO INICIAL
         print(f"📊 Retreinando com {len(X_new)} novos exemplos...")
         print(f"   Fine-tuning: {self.fine_tune_epochs} épocas, lr={self.fine_tune_lr}")
+        print(f"   Seguindo mesmo padrão do treinamento inicial")
         
-        # Validação: se tiver poucos dados, usar menos épocas
-        actual_epochs = self.fine_tune_epochs
-        if len(X_new) < 20:
-            actual_epochs = min(3, self.fine_tune_epochs)
-            print(f"   ⚠️  Poucos dados ({len(X_new)}), reduzindo para {actual_epochs} épocas")
+        # Salvar pesos antes do fine-tuning (para rollback se necessário)
+        import tempfile
+        backup_path = tempfile.mktemp(suffix='.h5')
+        self.model.save_weights(backup_path)
+        initial_loss = None
         
-        # Treinar com early stopping para evitar overfitting
-        from tensorflow.keras.callbacks import EarlyStopping
+        # Dividir em treino e validação (se tiver dados suficientes)
+        if len(X_new) > 50:
+            split_idx = int(len(X_new) * 0.8)
+            X_train_new = X_new[:split_idx]
+            y_train_new = y_new[:split_idx]
+            X_val_new = X_new[split_idx:]
+            y_val_new = y_new[split_idx:]
+            has_validation = True
+        else:
+            # Poucos dados: usar tudo como treino
+            X_train_new = X_new
+            y_train_new = y_new
+            X_val_new = None
+            y_val_new = None
+            has_validation = False
+        
+        # Criar callbacks seguindo padrão do treinamento inicial
+        from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
         
         callbacks = []
-        if len(X_new) > 10:
-            # Early stopping apenas se tiver dados suficientes para validação
+        
+        # Early Stopping (mesmo padrão do treinamento inicial)
+        if has_validation:
             early_stop = EarlyStopping(
-                monitor='val_loss' if len(X_new) > 20 else 'loss',
-                patience=2,
+                monitor='val_loss',
+                patience=10,  # Mais conservador que treino inicial (20), mas ainda generoso
                 restore_best_weights=True,
-                verbose=0
+                min_delta=0.00005,
+                verbose=1
             )
             callbacks.append(early_stop)
+            print("   ✓ Early Stopping ativado (patience=10)")
         
-        # Treinar
-        history = self.model.fit(
-            X_new, y_new,
-            epochs=actual_epochs,
-            batch_size=min(16, len(X_new)),  # Batch menor para poucos dados
-            verbose=1 if verbose else 0,
-            validation_split=0.2 if len(X_new) > 20 else 0.0,
-            callbacks=callbacks
-        )
+        # Reduce LR on Plateau (mesmo padrão do treinamento inicial)
+        if has_validation:
+            reduce_lr = ReduceLROnPlateau(
+                monitor='val_loss',
+                factor=0.5,
+                patience=5,
+                min_lr=0.000001,  # Muito baixo para fine-tuning
+                verbose=1
+            )
+            callbacks.append(reduce_lr)
+            print("   ✓ Reduce LR on Plateau ativado")
         
-        # Salvar modelo atualizado
-        self.model.save(self.model_path)
-        print(f"✓ Modelo atualizado salvo em: {self.model_path}")
+        # Calcular loss inicial para comparação
+        if has_validation:
+            initial_loss = self.model.evaluate(X_val_new, y_val_new, verbose=0)[0]
+            print(f"   Loss inicial (validação): {initial_loss:.6f}")
+        
+        # Treinar seguindo padrão do treinamento inicial
+        batch_size = min(48, len(X_train_new))  # Mesmo batch_size do treinamento inicial
+        
+        if has_validation:
+            history = self.model.fit(
+                X_train_new, y_train_new,
+                validation_data=(X_val_new, y_val_new),
+                epochs=self.fine_tune_epochs,
+                batch_size=batch_size,
+                callbacks=callbacks,
+                verbose=1 if verbose else 0
+            )
+            final_loss = min(history.history['val_loss'])
+        else:
+            history = self.model.fit(
+                X_train_new, y_train_new,
+                epochs=min(10, self.fine_tune_epochs),  # Menos épocas se não tiver validação
+                batch_size=batch_size,
+                callbacks=callbacks,
+                verbose=1 if verbose else 0
+            )
+            final_loss = min(history.history['loss'])
+        
+        print(f"   Loss final: {final_loss:.6f}")
+        
+        # Validar performance antes de salvar
+        should_save = True
+        if initial_loss is not None:
+            improvement = initial_loss - final_loss
+            print(f"   Melhoria: {improvement:+.6f}")
+            
+            # Só salvar se melhorou ou manteve (não piorou significativamente)
+            if improvement < -0.01:  # Piorou mais de 0.01
+                print(f"   ⚠️  Modelo piorou significativamente!")
+                print(f"   🔄 Restaurando pesos anteriores...")
+                self.model.load_weights(backup_path)
+                should_save = False
+            elif improvement > 0:
+                print(f"   ✅ Modelo melhorou!")
+            else:
+                print(f"   ➡️  Modelo manteve performance")
+        
+        # Salvar modelo apenas se melhorou ou manteve
+        if should_save:
+            self.model.save(self.model_path)
+            print(f"✓ Modelo atualizado salvo em: {self.model_path}")
+        else:
+            print(f"⚠️  Modelo NÃO foi salvo (performance piorou)")
+        
+        # Limpar backup
+        import os
+        if os.path.exists(backup_path):
+            os.remove(backup_path)
         
         # Limpar buffer
         self.new_data_buffer = []
