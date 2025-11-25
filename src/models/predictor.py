@@ -73,15 +73,44 @@ class StockPredictor:
             self.scaler = scaler_data['scaler']
             self.feature_names = scaler_data.get('feature_names')
             self.target_column = scaler_data.get('target_column', 'Close')
-            self.target_idx = scaler_data.get('target_idx', 0)  # ✅ Usar target_idx salvo
+            self.target_idx = scaler_data.get('target_idx')
+            
+            # ✅ VALIDAÇÃO: Garantir que target_idx está definido
+            if self.target_idx is None:
+                # Tentar encontrar pelo nome da coluna
+                if self.feature_names and self.target_column in self.feature_names:
+                    self.target_idx = self.feature_names.index(self.target_column)
+                    print(f"⚠️  target_idx não encontrado, usando índice de '{self.target_column}': {self.target_idx}")
+                else:
+                    # Fallback para índice 0 (Close geralmente é primeiro após feature selection)
+                    self.target_idx = 0
+                    print(f"⚠️  WARNING: target_idx não encontrado, usando fallback índice 0")
+            
+            # ✅ VALIDAÇÃO: Verificar se target_idx é válido
+            n_features = self.scaler.n_features_in_
+            if self.target_idx >= n_features:
+                raise ValueError(
+                    f"target_idx ({self.target_idx}) >= número de features ({n_features}). "
+                    f"Scaler pode estar inconsistente com o modelo."
+                )
+            
             print(f"✓ Scaler carregado de: {self.scaler_path}")
             print(f"   Target: {self.target_column} (índice {self.target_idx})")
+            print(f"   Features: {n_features}")
         else:
             # Versão antiga, só o scaler
             self.scaler = scaler_data
-            self.target_idx = 0  # Fallback
+            # Tentar encontrar Close nas feature_names se disponível
+            if hasattr(self.scaler, 'feature_names_in_'):
+                feature_names_list = list(self.scaler.feature_names_in_)
+                if 'Close' in feature_names_list:
+                    self.target_idx = feature_names_list.index('Close')
+                else:
+                    self.target_idx = 0
+            else:
+                self.target_idx = 0  # Fallback
             print(f"✓ Scaler carregado de: {self.scaler_path} (versão antiga)")
-            print(f"   ⚠️ WARNING: Usando índice padrão 0 para target")
+            print(f"   ⚠️ WARNING: Usando índice {self.target_idx} para target (fallback)")
 
     def load_all(self):
         """
@@ -166,9 +195,22 @@ class StockPredictor:
         """
         if self.scaler is None:
             raise ValueError("Scaler não foi carregado!")
+        
+        if self.target_idx is None:
+            raise ValueError(
+                "target_idx não foi definido! Carregue o scaler primeiro com load_scaler()."
+            )
 
         # ✅ CORREÇÃO: Usar target_idx salvo ao invés de índice fixo
         n_features = self.scaler.n_features_in_
+        
+        # ✅ VALIDAÇÃO: Verificar se target_idx é válido
+        if self.target_idx >= n_features:
+            raise ValueError(
+                f"target_idx ({self.target_idx}) >= número de features ({n_features}). "
+                f"Verifique se o scaler corresponde ao modelo."
+            )
+        
         dummy = np.zeros((1, n_features))
         dummy[0, self.target_idx] = value_scaled  # ✅ Usar target_idx correto
 
@@ -291,7 +333,7 @@ class StockPredictor:
             # Atualizar sequência (shift + nova predição)
             # NOTA: Isso é simplificado - idealmente deveria atualizar todas as features
             new_row = current_sequence[-1].copy()
-            new_row[3] = next_pred_scaled  # Atualizar Close
+            new_row[self.target_idx] = next_pred_scaled  # ✅ CORREÇÃO: Usar target_idx dinâmico
 
             current_sequence = np.vstack([current_sequence[1:], new_row])
 
