@@ -17,7 +17,7 @@
   ],
   "target_column": "Close",
   "target_idx": 0,
-  "sequence_length": 60,
+  "sequence_length": 90,
   "use_vix": true,
   "feature_engineering_config": {
     "use_moving_averages": false,
