@@ -44,35 +44,45 @@ features:
 
 # Modelo LSTM
 model:
-  # Arquitetura SIMPLIFICADA (correção de overfitting)
-  # Reduzido de 3 para 2 camadas LSTM
-  # Reduzido unidades: 128→64→32 para 64→32
-  sequence_length: 60  # Usar 60 dias para prever próximo
+  # Arquitetura MELHORADA para melhor performance
+  # Aumentada capacidade com melhor regularização
+  sequence_length: 90  # ✅ Aumentado: mais contexto temporal (60 → 90)
 
   lstm_layers:
-    - units: 64        # Reduzido de 128
+    - units: 128       # ✅ Aumentado: mais capacidade (64 → 128)
       return_sequences: true
-      dropout: 0.2
-    - units: 32        # Mantido
+      dropout: 0.3     # ✅ Aumentado: melhor regularização (0.2 → 0.3)
+      batch_normalization: true  # ✅ Novo: estabiliza treinamento
+    - units: 64        # ✅ Aumentado: mais capacidade (32 → 64)
+      return_sequences: true
+      dropout: 0.3     # ✅ Aumentado: melhor regularização
+      batch_normalization: true  # ✅ Novo
+    - units: 32        # ✅ Mantido: camada final
       return_sequences: false
-      dropout: 0.2
-    # Removida 3ª camada LSTM (era excessiva)
+      dropout: 0.3     # ✅ Aumentado: melhor regularização
+      batch_normalization: true  # ✅ Novo
 
   dense_layers:
-    - units: 8         # Reduzido de 16
+    - units: 32        # ✅ Aumentado: mais capacidade (8 → 32)
       activation: "relu"
+      dropout: 0.2     # ✅ Novo: dropout adicional
+      batch_normalization: true  # ✅ Novo
+    - units: 16        # ✅ Novo: camada intermediária
+      activation: "relu"
+      dropout: 0.2     # ✅ Novo: dropout adicional
+      batch_normalization: false  # Não necessário na última Dense antes do output
     - units: 1
       activation: null  # Linear para regressão
 
   # Compilação
   optimizer: "adam"
-  learning_rate: 0.001
+  learning_rate: 0.0005  # ✅ Reduzido: mais estável (0.001 → 0.0005)
   loss: "mse"
   metrics: ["mae"]
 
 # Treinamento
 training:
-  batch_size: 32
+  batch_size: 64  # ✅ Aumentado: melhor generalização (32 → 64)
   epochs: 100
   validation_split: 0.0  # Já temos validação separada
 

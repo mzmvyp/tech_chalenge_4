@@ -16,7 +16,7 @@ Data: 2024-11-16
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l1_l2  # CORREÇÃO: Adicionar regularização
 from typing import Dict, List, Any, Optional
@@ -82,12 +82,13 @@ class LSTMStockPredictor:
         model = Sequential()
 
         # ============================================
-        # CAMADAS LSTM
+        # CAMADAS LSTM COM BATCHNORMALIZATION
         # ============================================
         for i, layer_config in enumerate(self.lstm_layers):
             units = layer_config['units']
             return_sequences = layer_config.get('return_sequences', False)
             dropout = layer_config.get('dropout', 0.0)
+            use_batch_norm = layer_config.get('batch_normalization', True)  # ✅ Novo: BatchNorm opcional
 
             # ✅ CORREÇÃO: Usar dropout INTERNO da LSTM (mais eficaz)
             # Dropout interno regulariza DENTRO da LSTM, não só entre camadas
@@ -99,8 +100,8 @@ class LSTMStockPredictor:
                     input_shape=(self.sequence_length, self.n_features),
                     dropout=dropout,                    # ✅ Dropout nas entradas
                     recurrent_dropout=dropout,          # ✅ Dropout recorrente
-                    kernel_regularizer=l1_l2(l1=0.001, l2=0.001),
-                    recurrent_regularizer=l1_l2(l1=0.001, l2=0.001),
+                    kernel_regularizer=l1_l2(l1=0.0001, l2=0.0001),  # ✅ Reduzido para evitar underfitting
+                    recurrent_regularizer=l1_l2(l1=0.0001, l2=0.0001),
                     name=f'lstm_{i+1}'
                 ))
             else:
@@ -109,30 +110,45 @@ class LSTMStockPredictor:
                     return_sequences=return_sequences,
                     dropout=dropout,                    # ✅ Dropout nas entradas
                     recurrent_dropout=dropout,          # ✅ Dropout recorrente
-                    kernel_regularizer=l1_l2(l1=0.001, l2=0.001),
-                    recurrent_regularizer=l1_l2(l1=0.001, l2=0.001),
+                    kernel_regularizer=l1_l2(l1=0.0001, l2=0.0001),  # ✅ Reduzido
+                    recurrent_regularizer=l1_l2(l1=0.0001, l2=0.0001),
                     name=f'lstm_{i+1}'
                 ))
 
-            # ❌ REMOVIDO: Dropout como camada separada não é mais necessário
-            # O dropout interno da LSTM é mais eficaz
-
-            print(f"✓ LSTM Layer {i+1}: units={units}, return_seq={return_sequences}, dropout={dropout} (interno)")
+            # ✅ MELHORIA: Adicionar BatchNormalization após cada LSTM
+            # Isso estabiliza o treinamento e permite learning rates maiores
+            if use_batch_norm:
+                model.add(BatchNormalization(name=f'batch_norm_lstm_{i+1}'))
+                print(f"✓ LSTM Layer {i+1}: units={units}, return_seq={return_sequences}, dropout={dropout}, BatchNorm=True")
+            else:
+                print(f"✓ LSTM Layer {i+1}: units={units}, return_seq={return_sequences}, dropout={dropout}, BatchNorm=False")
 
         # ============================================
-        # CAMADAS DENSE
+        # CAMADAS DENSE COM DROPOUT E BATCHNORM
         # ============================================
         for i, layer_config in enumerate(self.dense_layers):
             units = layer_config['units']
             activation = layer_config.get('activation', None)
+            dropout = layer_config.get('dropout', 0.0)  # ✅ Novo: Dropout opcional nas Dense
+            use_batch_norm = layer_config.get('batch_normalization', False)  # ✅ Novo: BatchNorm opcional
 
+            # Adicionar camada Dense
             model.add(Dense(
                 units=units,
                 activation=activation,
+                kernel_regularizer=l1_l2(l1=0.0001, l2=0.0001) if i < len(self.dense_layers) - 1 else None,  # ✅ Regularização (exceto output)
                 name=f'dense_{i+1}'
             ))
 
-            print(f"✓ Dense Layer {i+1}: units={units}, activation={activation}")
+            # ✅ MELHORIA: BatchNormalization antes da ativação (se não for última camada)
+            if use_batch_norm and i < len(self.dense_layers) - 1:  # Não aplicar na última camada
+                model.add(BatchNormalization(name=f'batch_norm_dense_{i+1}'))
+
+            # ✅ MELHORIA: Dropout após BatchNorm (se não for última camada)
+            if dropout > 0 and i < len(self.dense_layers) - 1:  # Não aplicar na última camada
+                model.add(Dropout(dropout, name=f'dropout_dense_{i+1}'))
+
+            print(f"✓ Dense Layer {i+1}: units={units}, activation={activation}, dropout={dropout}, BatchNorm={use_batch_norm}")
 
         # ============================================
         # COMPILAR MODELO
