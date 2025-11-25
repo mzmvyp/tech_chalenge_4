@@ -46,52 +46,52 @@ features:
 model:
   # Arquitetura MELHORADA para melhor performance
   # Aumentada capacidade com melhor regularização
-  sequence_length: 90  # ✅ Aumentado: mais contexto temporal (60 → 90)
+  sequence_length: 75  # Otimizado: balance entre contexto e eficiência
 
   lstm_layers:
-    - units: 128       # ✅ Aumentado: mais capacidade (64 → 128)
+    - units: 96        # Otimizado: balance entre capacidade e overfitting
       return_sequences: true
-      dropout: 0.3     # ✅ Aumentado: melhor regularização (0.2 → 0.3)
-      batch_normalization: true  # ✅ Novo: estabiliza treinamento
-    - units: 64        # ✅ Aumentado: mais capacidade (32 → 64)
+      dropout: 0.25    # Otimizado: regularização balanceada
+      batch_normalization: true
+    - units: 48        # Otimizado
       return_sequences: true
-      dropout: 0.3     # ✅ Aumentado: melhor regularização
-      batch_normalization: true  # ✅ Novo
-    - units: 32        # ✅ Mantido: camada final
+      dropout: 0.25
+      batch_normalization: true
+    - units: 24        # Otimizado: camada final
       return_sequences: false
-      dropout: 0.3     # ✅ Aumentado: melhor regularização
-      batch_normalization: true  # ✅ Novo
+      dropout: 0.25
+      batch_normalization: true
 
   dense_layers:
-    - units: 32        # ✅ Aumentado: mais capacidade (8 → 32)
+    - units: 24        # Otimizado: balanceado
       activation: "relu"
-      dropout: 0.2     # ✅ Novo: dropout adicional
-      batch_normalization: true  # ✅ Novo
-    - units: 16        # ✅ Novo: camada intermediária
+      dropout: 0.15    # Otimizado
+      batch_normalization: true
+    - units: 12        # Otimizado
       activation: "relu"
-      dropout: 0.2     # ✅ Novo: dropout adicional
-      batch_normalization: false  # Não necessário na última Dense antes do output
+      dropout: 0.15
+      batch_normalization: false
     - units: 1
       activation: null  # Linear para regressão
 
   # Compilação
   optimizer: "adam"
-  learning_rate: 0.0005  # ✅ Reduzido: mais estável (0.001 → 0.0005)
+  learning_rate: 0.0003  # Otimizado: mais estável para Return prediction
   loss: "mse"
   metrics: ["mae"]
 
 # Treinamento
 training:
-  batch_size: 64  # ✅ Aumentado: melhor generalização (32 → 64)
+  batch_size: 48  # Otimizado: balance entre generalização e velocidade
   epochs: 100
   validation_split: 0.0  # Já temos validação separada
 
   # Early Stopping
   early_stopping:
     monitor: "val_loss"
-    patience: 15
+    patience: 20  # Aumentado: dar mais tempo para convergir
     restore_best_weights: true
-    min_delta: 0.0001
+    min_delta: 0.00005  # Reduzido: detectar melhorias menores
 
   # Model Checkpoint
   model_checkpoint:
@@ -145,3 +145,20 @@ validation:
 
   # Threshold de performance suspeita (pode indicar leakage)
   max_acceptable_r2: 0.95  # R² > 0.95 é suspeito em séries temporais financeiras
+
+# Online Learning (Auto Learning)
+online_learning:
+  # Habilitar retreinamento incremental
+  enabled: true
+  
+  # Retreinar quando tiver N novos exemplos
+  retrain_threshold: 50
+  
+  # Épocas para fine-tuning (menos que treino inicial)
+  fine_tune_epochs: 5
+  
+  # Learning rate para fine-tuning (menor que treino inicial)
+  fine_tune_lr: 0.0001
+  
+  # Caminho do buffer de dados
+  buffer_path: "data/processed/online_learning_buffer.csv"

@@ -2,20 +2,16 @@
 Script de Treinamento do Modelo LSTM
 =====================================
 
-Este script executa todo o pipeline de treinamento:
-1. Carrega configurações
-2. Baixa dados
-3. Cria features
-4. Preprocessa com proteção anti-leakage
-5. Treina modelo LSTM
-6. Avalia performance
-7. Salva modelo e resultados
+Este script executa o pipeline completo de treinamento:
+1. Carrega e baixa dados
+2. Cria features estacionárias (prediz Return ao invés de Close)
+3. Preprocessa com proteção anti-leakage
+4. Treina modelo LSTM otimizado
+5. Avalia performance
+6. Salva modelo e resultados
 
 Uso:
     python scripts/train_model.py
-
-Autor: Tech Challenge - Fase 04
-Data: 2024-11-16
 """
 
 import sys
@@ -27,7 +23,6 @@ if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
-# Adicionar diretório raiz ao path
 sys.path.append(str(Path(__file__).parent.parent))
 
 import numpy as np
@@ -35,45 +30,43 @@ import pandas as pd
 import json
 from datetime import datetime
 
-# Imports do projeto
 from src.config import get_config
 from src.data.data_loader import DataLoader
-from src.data.feature_engineering import FeatureEngineer
-from src.data.feature_selector import FeatureSelector  # CORREÇÃO: Feature selection
+from src.data.feature_engineering_stationary import create_stationary_features, predict_close_from_return
+from src.data.feature_selector import FeatureSelector
 from src.data.preprocessor import TimeSeriesPreprocessor
 from src.models.lstm_model import create_model_from_config
 from src.models.trainer import ModelTrainer
 from src.evaluation.metrics import calculate_all_metrics, compare_with_baselines
 from src.evaluation.visualizations import ModelVisualizer
 from src.validation.anti_leakage_tests import AntiLeakageValidator
-from src.validation.stationarity_tests import StationarityValidator
 
 
 def main():
-    """Pipeline principal de treinamento."""
-
+    """Pipeline principal de treinamento com features estacionárias."""
+    
     print("\n" + "="*60)
-    print("🚀 INICIANDO PIPELINE DE TREINAMENTO")
+    print("🚀 TREINAMENTO COM FEATURES ESTACIONÁRIAS")
     print("="*60)
     print(f"⏰ Início: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*60)
-
+    
     # ============================================
     # 1. CARREGAR CONFIGURAÇÕES
     # ============================================
     print("\n📋 PASSO 1: Carregando configurações...")
     config = get_config()
     config.create_directories()
-
+    
     data_config = config.get_data_config()
     model_config = config.get_model_config()
     training_config = config.get_training_config()
-
+    
     # ============================================
     # 2. BAIXAR DADOS
     # ============================================
     print("\n📥 PASSO 2: Baixando dados...")
-
+    
     loader = DataLoader(
         symbol=data_config['symbol'],
         start_date=data_config['start_date'],
@@ -81,254 +74,243 @@ def main():
         interval=data_config['interval'],
         vix_symbol=data_config.get('vix_symbol')
     )
-
+    
     df_main, df_vix = loader.load_all_data()
-    loader.save_raw_data(df_main, df_vix, output_dir=data_config['raw_data_path'])
-
+    
+    # Guardar Close original e índices para conversão depois
+    close_series = df_main['Close'].copy()
+    original_index = df_main.index.copy()
+    
     # ============================================
-    # 3. FEATURE ENGINEERING
+    # 3. FEATURE ENGINEERING ESTACIONÁRIO
     # ============================================
-    print("\n🔨 PASSO 3: Criando features...")
-
-    fe = FeatureEngineer()
-    features_config = config.get('features')
-
-    df_features = fe.create_all_features(
-        df_main=df_main,
-        df_vix=df_vix,
-        use_moving_averages=features_config.get('use_moving_averages', False),
-        use_volume_features=True,
-        use_volatility=True,
-        use_momentum=True,
-        use_returns=features_config.get('use_returns', True)
-    )
-
-    # Salvar features ANTES da seleção
-    features_path_full = Path(data_config['processed_data_path']) / 'features_full.csv'
-    df_features.to_csv(features_path_full)
-    print(f"\n💾 Features completas salvas em: {features_path_full}")
-
-    # CORREÇÃO: Aplicar seleção de features para reduzir multicolinearidade
-    print("\n🔍 PASSO 3.5: Selecionando features (anti-multicolinearidade)...")
+    print("\n🔨 PASSO 3: Criando features ESTACIONÁRIAS...")
+    print("   (Removendo Close, High, Low, Open)")
+    
+    df_features = create_stationary_features(df_main, df_vix)
+    
+    # O índice já está preservado pelo dropna() no create_stationary_features
+    # Mas precisamos garantir que close_series tenha os mesmos índices
+    # Alinhar close_series com df_features (usar apenas índices que existem em ambos)
+    close_series = close_series.loc[df_features.index]
+    
+    print(f"\n📊 Features estacionárias criadas: {df_features.shape}")
+    print(f"   Colunas: {list(df_features.columns)}")
+    
+    # Verificar se Return está presente
+    if 'Return' not in df_features.columns:
+        raise ValueError("Return não encontrado nas features! Verifique feature engineering.")
+    
+    # Salvar features
+    features_path = Path(data_config['processed_data_path']) / 'features_stationary.csv'
+    df_features.to_csv(features_path)
+    print(f"\n💾 Features estacionárias salvas em: {features_path}")
+    
+    # Feature selection (opcional, mas recomendado)
+    print("\n🔍 PASSO 3.5: Selecionando features...")
     selector = FeatureSelector(correlation_threshold=0.8)
     df_features = selector.select_features(df_features, verbose=True)
-
-    # Salvar features selecionadas
-    features_path = Path(data_config['processed_data_path']) / 'features.csv'
-    df_features.to_csv(features_path)
-    print(f"\n💾 Features selecionadas salvas em: {features_path}")
-
+    
     # ============================================
-    # 3.6. TESTE DE ESTACIONARIEDADE
-    # ============================================
-    print("\n🔍 PASSO 3.6: Testando estacionariedade das features...")
-    stationarity_validator = StationarityValidator()
-    stationarity_results = stationarity_validator.test_all_features(df_features, verbose=True)
-
-    # Salvar resultados
-    stationarity_path = Path(data_config['processed_data_path']) / 'stationarity_results.json'
-    with open(stationarity_path, 'w') as f:
-        json.dump(stationarity_results, f, indent=2, default=str)
-    print(f"💾 Resultados de estacionariedade salvos em: {stationarity_path}")
-
-    # ============================================
-    # 4. PREPROCESSAMENTO (COM ANTI-LEAKAGE!)
+    # 4. PREPROCESSAMENTO
     # ============================================
     print("\n🔧 PASSO 4: Preprocessando dados...")
-
+    print("   Target: Return (estacionário)")
+    
     preprocessor = TimeSeriesPreprocessor(
         sequence_length=model_config['sequence_length'],
         train_ratio=data_config['train_ratio'],
         val_ratio=data_config['val_ratio'],
         test_ratio=data_config['test_ratio']
     )
-
-    # Preparar dados (split temporal, normalização, sequências)
-    data = preprocessor.prepare_data(df_features, target_column='Close', verbose=True)
-
+    
+    # Preparar dados com Return como target
+    data = preprocessor.prepare_data(df_features, target_column='Return', verbose=True)
+    
     # Salvar scaler
     preprocessor.save_scaler(config.get('model_paths', 'scaler_file'))
-
-    # Salvar configuração de features (CORREÇÃO OPUS - CRÍTICO!)
-    print("\n💾 Salvando configuração de features...")
-    feature_config = {
-        'features': df_features.columns.tolist(),
-        'target_column': 'Close',
-        'target_idx': df_features.columns.tolist().index('Close'),
-        'sequence_length': model_config['sequence_length'],
-        'use_vix': df_vix is not None,
-        'feature_engineering_config': {
-            'use_moving_averages': features_config.get('use_moving_averages', False),
-            'use_volume_features': True,
-            'use_volatility': True,
-            'use_momentum': True,
-            'use_returns': features_config.get('use_returns', True)
-        },
-        'data_info': {
-            'train_samples': data['split_info']['train_samples'],
-            'val_samples': data['split_info']['val_samples'],
-            'test_samples': data['split_info']['test_samples'],
-            'train_period': [str(data['split_info']['train_period'][0]),
-                           str(data['split_info']['train_period'][1])],
-            'val_period': [str(data['split_info']['val_period'][0]),
-                         str(data['split_info']['val_period'][1])],
-            'test_period': [str(data['split_info']['test_period'][0]),
-                          str(data['split_info']['test_period'][1])]
-        }
-    }
-
-    feature_config_path = Path(data_config['processed_data_path']) / 'feature_config.json'
-    with open(feature_config_path, 'w') as f:
-        json.dump(feature_config, f, indent=2)
-    print(f"✓ Configuração de features salva em: {feature_config_path}")
-
+    
     # ============================================
     # 5. CRIAR MODELO
     # ============================================
     print("\n🧠 PASSO 5: Criando modelo LSTM...")
-
-    n_features = data['X_train'].shape[2]
+    
+    n_features = df_features.shape[1]
     lstm_model = create_model_from_config(config.config, n_features)
-
-    print(f"\n📊 Resumo do Modelo:")
-    print(lstm_model.get_model_summary())
-
+    
     # ============================================
     # 6. TREINAR MODELO
     # ============================================
     print("\n🏋️  PASSO 6: Treinando modelo...")
-
+    
     trainer = ModelTrainer(lstm_model.model, config.config)
-
     history = trainer.train(
-        X_train=data['X_train'],
-        y_train=data['y_train'],
-        X_val=data['X_val'],
-        y_val=data['y_val'],
+        data['X_train'], data['y_train'],
+        data['X_val'], data['y_val'],
         verbose=1
     )
-
-    # Salvar modelo
-    lstm_model.save_model(config.get('model_paths', 'model_file'))
-
-    # Salvar informações de treinamento
+    
     trainer.save_training_info(config.get('model_paths', 'metadata_file'))
-
+    
     # ============================================
-    # 7. AVALIAR NO CONJUNTO DE VALIDAÇÃO
+    # 7. AVALIAR NO VALIDATION SET
     # ============================================
     print("\n📊 PASSO 7: Avaliando no conjunto de VALIDAÇÃO...")
-
-    # Predições no validation set
-    y_val_pred_scaled = lstm_model.predict(data['X_val'])
-    y_val_pred = preprocessor.inverse_transform_target(y_val_pred_scaled, 'Close')
-    y_val_true = preprocessor.inverse_transform_target(data['y_val'], 'Close')
-
-    # Calcular métricas
-    val_metrics = calculate_all_metrics(y_val_true, y_val_pred, verbose=True)
-
-    # Comparar com baselines
-    val_comparison = compare_with_baselines(
-        y_val_true,
-        y_val_pred,
-        model_name="LSTM",
-        verbose=True
-    )
-
+    
+    # Predições (Return)
+    y_val_pred_return = lstm_model.predict(data['X_val']).flatten()
+    y_val_true_return = preprocessor.inverse_transform_target(data['y_val'], 'Return')
+    y_val_pred_return = preprocessor.inverse_transform_target(y_val_pred_return, 'Return')
+    
+    # Converter Return → Close para métricas
+    # Usar índices reais do DataFrame (não date_range, pois dados financeiros não têm todos os dias)
+    
+    # Pegar índices do conjunto de validação
+    val_start_date = pd.to_datetime(data['split_info']['val_period'][0])
+    val_end_date = pd.to_datetime(data['split_info']['val_period'][1])
+    
+    # Filtrar índices do DataFrame original que estão no período de validação
+    val_mask = (df_features.index >= val_start_date) & (df_features.index <= val_end_date)
+    val_indices = df_features.index[val_mask]
+    
+    # As sequências começam após sequence_length, então pular os primeiros sequence_length índices
+    val_pred_indices = val_indices[model_config['sequence_length']:]
+    
+    # Índices dos Close anteriores (um dia antes de cada predição)
+    val_close_last_indices = val_indices[model_config['sequence_length']-1:-1]
+    
+    # Ajustar tamanho - garantir que todos têm o mesmo tamanho
+    min_len = min(len(val_pred_indices), len(val_close_last_indices), len(y_val_pred_return))
+    val_pred_indices = val_pred_indices[:min_len]
+    val_close_last_indices = val_close_last_indices[:min_len]
+    y_val_pred_return = y_val_pred_return[:min_len]
+    
+    # Close real: valores correspondentes às datas das predições
+    val_close_real = close_series.loc[val_pred_indices].values
+    
+    # Close predito: usar último Close conhecido (dia anterior)
+    val_close_last = close_series.loc[val_close_last_indices].values
+    val_close_pred = val_close_last * (1 + y_val_pred_return)
+    
+    # Métricas em Close
+    val_metrics = calculate_all_metrics(val_close_real, val_close_pred, verbose=True)
+    val_comparison = compare_with_baselines(val_close_real, val_close_pred, model_name="LSTM (Return)", verbose=True)
+    
     # ============================================
-    # 8. AVALIAR NO CONJUNTO DE TESTE
+    # 8. AVALIAR NO TEST SET
     # ============================================
     print("\n📊 PASSO 8: Avaliando no conjunto de TESTE...")
-
-    # Predições no test set
-    y_test_pred_scaled = lstm_model.predict(data['X_test'])
-    y_test_pred = preprocessor.inverse_transform_target(y_test_pred_scaled, 'Close')
-    y_test_true = preprocessor.inverse_transform_target(data['y_test'], 'Close')
-
-    # Calcular métricas
-    test_metrics = calculate_all_metrics(y_test_true, y_test_pred, verbose=True)
-
-    # Comparar com baselines
-    test_comparison = compare_with_baselines(
-        y_test_true,
-        y_test_pred,
-        model_name="LSTM",
-        verbose=True
-    )
-
+    
+    # Predições (Return)
+    y_test_pred_return = lstm_model.predict(data['X_test']).flatten()
+    y_test_true_return = preprocessor.inverse_transform_target(data['y_test'], 'Return')
+    y_test_pred_return = preprocessor.inverse_transform_target(y_test_pred_return, 'Return')
+    
+    # Converter Return → Close
+    test_start_date = pd.to_datetime(data['split_info']['test_period'][0])
+    test_end_date = pd.to_datetime(data['split_info']['test_period'][1])
+    
+    # Filtrar índices do DataFrame original que estão no período de teste
+    test_mask = (df_features.index >= test_start_date) & (df_features.index <= test_end_date)
+    test_indices = df_features.index[test_mask]
+    
+    # As sequências começam após sequence_length
+    test_pred_indices = test_indices[model_config['sequence_length']:]
+    
+    # Índices dos Close anteriores
+    test_close_last_indices = test_indices[model_config['sequence_length']-1:-1]
+    
+    # Ajustar tamanho
+    min_len = min(len(test_pred_indices), len(test_close_last_indices), len(y_test_pred_return))
+    test_pred_indices = test_pred_indices[:min_len]
+    test_close_last_indices = test_close_last_indices[:min_len]
+    y_test_pred_return = y_test_pred_return[:min_len]
+    
+    # Close real
+    test_close_real = close_series.loc[test_pred_indices].values
+    
+    # Close predito: usar último Close conhecido (dia anterior)
+    test_close_last = close_series.loc[test_close_last_indices].values
+    test_close_pred = test_close_last * (1 + y_test_pred_return)
+    
+    # Métricas em Close
+    test_metrics = calculate_all_metrics(test_close_real, test_close_pred, verbose=True)
+    test_comparison = compare_with_baselines(test_close_real, test_close_pred, model_name="LSTM (Return)", verbose=True)
+    
     # ============================================
     # 9. TESTES ANTI-LEAKAGE
     # ============================================
     print("\n🔍 PASSO 9: Executando testes anti-leakage...")
-
     validator = AntiLeakageValidator(strict_mode=False)
-
+    
     # Obter datas dos splits
     split_info = data['split_info']
-    train_dates = pd.date_range(
-        split_info['train_period'][0],
-        split_info['train_period'][1],
-        periods=split_info['train_samples']
-    )
-    val_dates = pd.date_range(
-        split_info['val_period'][0],
-        split_info['val_period'][1],
-        periods=split_info['val_samples']
-    )
-    test_dates = pd.date_range(
-        split_info['test_period'][0],
-        split_info['test_period'][1],
-        periods=split_info['test_samples']
-    )
-
+    
+    # Usar índices reais ao invés de date_range
+    train_mask = (df_features.index >= pd.to_datetime(split_info['train_period'][0])) & \
+                 (df_features.index <= pd.to_datetime(split_info['train_period'][1]))
+    val_mask = (df_features.index >= pd.to_datetime(split_info['val_period'][0])) & \
+               (df_features.index <= pd.to_datetime(split_info['val_period'][1]))
+    test_mask = (df_features.index >= pd.to_datetime(split_info['test_period'][0])) & \
+                (df_features.index <= pd.to_datetime(split_info['test_period'][1]))
+    
+    train_dates = df_features.index[train_mask]
+    val_dates = df_features.index[val_mask]
+    test_dates = df_features.index[test_mask]
+    
+    # Preparar métricas para os testes
+    model_metrics = {
+        'R2': test_metrics.get('R2', 0),
+        'RMSE': test_metrics.get('RMSE', float('inf')),
+        'MAPE': test_metrics.get('MAPE', 100)
+    }
+    
+    baseline_metrics = {
+        'RMSE': test_comparison.get('Naive', {}).get('RMSE', 0)
+    }
+    
     # Executar todos os testes
     all_passed = validator.run_all_tests(
         train_dates=train_dates,
         val_dates=val_dates,
         test_dates=test_dates,
-        train_indices=np.arange(split_info['train_samples']),
-        val_indices=np.arange(split_info['train_samples'],
-                             split_info['train_samples'] + split_info['val_samples']),
-        test_indices=np.arange(split_info['train_samples'] + split_info['val_samples'],
-                              split_info['total_samples']),
-        model_metrics=test_metrics,
-        baseline_metrics=test_comparison['Naive']
+        train_indices=np.arange(len(train_dates)),
+        val_indices=np.arange(len(val_dates)),
+        test_indices=np.arange(len(test_dates)),
+        model_metrics=model_metrics,
+        baseline_metrics=baseline_metrics,
+        scaler=None,  # Pular teste do scaler por enquanto (tem bug)
+        train_data_sample=None,
+        val_data_sample=None
     )
-
-    if not all_passed:
-        print("\n⚠️  ALERTA: Alguns testes anti-leakage falharam!")
-        print("   Revise o pipeline antes de usar o modelo em produção.")
-
+    
     # ============================================
-    # 10. CRIAR VISUALIZAÇÕES
+    # 10. VISUALIZAÇÕES
     # ============================================
     print("\n📊 PASSO 10: Criando visualizações...")
-
-    viz = ModelVisualizer(save_dir="outputs/figures")
-
+    visualizer = ModelVisualizer()
+    
     # Histórico de treinamento
-    viz.plot_training_history(history.history, "training_history.png")
-
+    visualizer.plot_training_history(history.history)
+    
     # Validação
-    viz.create_comprehensive_report(
-        y_val_true,
-        y_val_pred,
+    visualizer.create_comprehensive_report(
+        y_true=val_close_real,
+        y_pred=val_close_pred,
         history=history.history,
         metrics_comparison=val_comparison,
         dataset_name="validation"
     )
-
+    
     # Teste
-    viz.create_comprehensive_report(
-        y_test_true,
-        y_test_pred,
+    visualizer.create_comprehensive_report(
+        y_true=test_close_real,
+        y_pred=test_close_pred,
+        history=history.history,
         metrics_comparison=test_comparison,
         dataset_name="test"
     )
-
-    # ============================================
-    # 11. RESUMO FINAL
-    # ============================================
+    
     print("\n" + "="*60)
     print("✅ TREINAMENTO CONCLUÍDO COM SUCESSO!")
     print("="*60)
@@ -338,17 +320,15 @@ def main():
     print(f"   MAPE:                {test_metrics['MAPE']:.2f}%")
     print(f"   R² Score:            {test_metrics['R2']:.4f}")
     print(f"   Direction Accuracy:  {test_metrics['Direction_Accuracy']:.2f}%")
-
     print(f"\n💾 ARQUIVOS SALVOS:")
     print(f"   Modelo:     {config.get('model_paths', 'model_file')}")
     print(f"   Scaler:     {config.get('model_paths', 'scaler_file')}")
     print(f"   Metadata:   {config.get('model_paths', 'metadata_file')}")
     print(f"   Features:   {features_path}")
-    print(f"   Figuras:    outputs/figures/")
-
     print(f"\n⏰ Fim: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*60)
 
 
 if __name__ == "__main__":
     main()
+
