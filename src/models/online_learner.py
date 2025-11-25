@@ -174,36 +174,71 @@ class OnlineLearner:
         df.to_csv(self.data_buffer_path)
         print(f"✓ Buffer salvo: {len(df)} exemplos")
     
-    def retrain(self, verbose: bool = True):
+    def retrain(
+        self,
+        X_new: Optional[np.ndarray] = None,
+        y_new: Optional[np.ndarray] = None,
+        verbose: bool = True
+    ):
         """
-        Retreina o modelo com novos dados do buffer.
+        Retreina o modelo com novos dados.
         
         Usa fine-tuning: treina apenas algumas épocas com learning rate menor.
+        
+        Args:
+            X_new: Novas sequências de entrada (opcional, pode vir do buffer)
+            y_new: Novos valores alvo (opcional)
+            verbose: Se True, exibe progresso
         """
         if self.model is None:
             self.load_model_and_scaler()
-        
-        if len(self.new_data_buffer) == 0:
-            print("⚠️  Buffer vazio, nada para retreinar")
-            return
         
         if verbose:
             print("\n" + "="*60)
             print("🔄 RETREINAMENTO INCREMENTAL (Online Learning)")
             print("="*60)
         
-        # Preparar dados do buffer
-        # TODO: Implementar preparação completa dos dados
-        # Por enquanto, apenas limpar buffer após retreinar
-        print(f"📊 Retreinando com {len(self.new_data_buffer)} novos exemplos...")
-        print("⚠️  Implementação completa requer integração com pipeline de dados")
-        print("   Por enquanto, buffer será limpo após retreinar")
+        # Se não foram passados dados, usar buffer
+        if X_new is None or y_new is None:
+            if len(self.new_data_buffer) == 0:
+                print("⚠️  Buffer vazio, nada para retreinar")
+                return
+            
+            # Preparar dados do buffer
+            # Por enquanto, apenas limpar buffer
+            # TODO: Implementar preparação completa quando tiver pipeline de dados
+            print(f"📊 Buffer tem {len(self.new_data_buffer)} novos exemplos")
+            print("⚠️  Para retreinar, precisa passar X_new e y_new")
+            print("   Ou implementar preparação completa do buffer")
+            
+            # Limpar buffer após processar
+            self.new_data_buffer = []
+            print("✓ Buffer processado e limpo")
+            return
+        
+        # Fine-tuning com novos dados
+        print(f"📊 Retreinando com {len(X_new)} novos exemplos...")
+        print(f"   Fine-tuning: {self.fine_tune_epochs} épocas, lr={self.fine_tune_lr}")
+        
+        # Treinar
+        history = self.model.fit(
+            X_new, y_new,
+            epochs=self.fine_tune_epochs,
+            batch_size=min(32, len(X_new)),
+            verbose=1 if verbose else 0,
+            validation_split=0.2 if len(X_new) > 10 else 0.0
+        )
+        
+        # Salvar modelo atualizado
+        self.model.save(self.model_path)
+        print(f"✓ Modelo atualizado salvo em: {self.model_path}")
         
         # Limpar buffer
         self.new_data_buffer = []
-        print("✓ Buffer limpo")
         
         if verbose:
+            print("="*60)
+            print("✅ Retreinamento concluído!")
             print("="*60)
     
     def predict_with_learning(
