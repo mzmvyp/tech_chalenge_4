@@ -1,0 +1,88 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# Data (não versionar dados grandes)
+data/raw/*.csv
+data/processed/*.csv
+data/raw/*.pkl
+data/processed/*.pkl
+*.h5
+*.hdf5
+
+# Models (não versionar modelos treinados)
+models/*.h5
+models/*.pkl
+models/*.json
+!models/.gitkeep
+
+# Logs
+*.log
+logs/
+*.out
+
+# Outputs (figuras e resultados)
+outputs/figures/*
+outputs/evaluation/*
+!outputs/.gitkeep
+!outputs/figures/.gitkeep
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Environment variables
+.env
+.env.local
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/

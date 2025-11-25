@@ -1,0 +1,198 @@
+{
+  "Close": {
+    "name": "Close",
+    "adf_statistic": -0.5060422454699254,
+    "p_value": 0.8908319895713047,
+    "n_lags": 10,
+    "n_observations": 1426,
+    "critical_values": {
+      "1%": -3.434944046599697,
+      "5%": -2.863568954302161,
+      "10%": -2.5678502032578696
+    },
+    "is_stationary": "False",
+    "interpretation": "N\u00c3O estacion\u00e1ria (p >= 0.10)"
+  },
+  "High": {
+    "name": "High",
+    "adf_statistic": -0.36936699838246906,
+    "p_value": 0.915089126437385,
+    "n_lags": 1,
+    "n_observations": 1435,
+    "critical_values": {
+      "1%": -3.4349151819757466,
+      "5%": -2.863556216004778,
+      "10%": -2.5678434198545568
+    },
+    "is_stationary": "False",
+    "interpretation": "N\u00c3O estacion\u00e1ria (p >= 0.10)"
+  },
+  "Low": {
+    "name": "Low",
+    "adf_statistic": -0.5859949197022118,
+    "p_value": 0.8741153025727337,
+    "n_lags": 1,
+    "n_observations": 1435,
+    "critical_values": {
+      "1%": -3.4349151819757466,
+      "5%": -2.863556216004778,
+      "10%": -2.5678434198545568
+    },
+    "is_stationary": "False",
+    "interpretation": "N\u00c3O estacion\u00e1ria (p >= 0.10)"
+  },
+  "Open": {
+    "name": "Open",
+    "adf_statistic": -0.40947460796621815,
+    "p_value": 0.9085047976782086,
+    "n_lags": 1,
+    "n_observations": 1435,
+    "critical_values": {
+      "1%": -3.4349151819757466,
+      "5%": -2.863556216004778,
+      "10%": -2.5678434198545568
+    },
+    "is_stationary": "False",
+    "interpretation": "N\u00c3O estacion\u00e1ria (p >= 0.10)"
+  },
+  "Volume": {
+    "name": "Volume",
+    "adf_statistic": -3.819183186599593,
+    "p_value": 0.0027170324021315623,
+    "n_lags": 24,
+    "n_observations": 1412,
+    "critical_values": {
+      "1%": -3.4349896798463924,
+      "5%": -2.8635890925399354,
+      "10%": -2.567860927320659
+    },
+    "is_stationary": "True",
+    "interpretation": "Fortemente estacion\u00e1ria (p < 0.01)"
+  },
+  "Return": {
+    "name": "Return",
+    "adf_statistic": -11.367940746694586,
+    "p_value": 9.128355254532343e-21,
+    "n_lags": 9,
+    "n_observations": 1427,
+    "critical_values": {
+      "1%": -3.4349408214067227,
+      "5%": -2.8635675309927153,
+      "10%": -2.5678494453155656
+    },
+    "is_stationary": "True",
+    "interpretation": "Fortemente estacion\u00e1ria (p < 0.01)"
+  },
+  "Volatility_30d": {
+    "name": "Volatility_30d",
+    "adf_statistic": -5.0350008660497805,
+    "p_value": 1.8912657344644674e-05,
+    "n_lags": 12,
+    "n_observations": 1424,
+    "critical_values": {
+      "1%": -3.434950510599593,
+      "5%": -2.8635718069244227,
+      "10%": -2.5678517223401403
+    },
+    "is_stationary": "True",
+    "interpretation": "Fortemente estacion\u00e1ria (p < 0.01)"
+  },
+  "Momentum_5d": {
+    "name": "Momentum_5d",
+    "adf_statistic": -8.588017313171578,
+    "p_value": 7.415953288150764e-14,
+    "n_lags": 24,
+    "n_observations": 1412,
+    "critical_values": {
+      "1%": -3.4349896798463924,
+      "5%": -2.8635890925399354,
+      "10%": -2.567860927320659
+    },
+    "is_stationary": "True",
+    "interpretation": "Fortemente estacion\u00e1ria (p < 0.01)"
+  },
+  "Momentum_10d": {
+    "name": "Momentum_10d",
+    "adf_statistic": -7.339762271481808,
+    "p_value": 1.0728466809714376e-10,
+    "n_lags": 24,
+    "n_observations": 1412,
+    "critical_values": {
+      "1%": -3.4349896798463924,
+      "5%": -2.8635890925399354,
+      "10%": -2.567860927320659
+    },
+    "is_stationary": "True",
+    "interpretation": "Fortemente estacion\u00e1ria (p < 0.01)"
+  },
+  "Volume_Change": {
+    "name": "Volume_Change",
+    "adf_statistic": -10.368189911511267,
+    "p_value": 2.3007254869076664e-18,
+    "n_lags": 18,
+    "n_observations": 1418,
+    "critical_values": {
+      "1%": -3.4349700122033804,
+      "5%": -2.8635804131233096,
+      "10%": -2.567856305330816
+    },
+    "is_stationary": "True",
+    "interpretation": "Fortemente estacion\u00e1ria (p < 0.01)"
+  },
+  "Volume_Relative_5": {
+    "name": "Volume_Relative_5",
+    "adf_statistic": -11.86625121162733,
+    "p_value": 6.664820880451359e-22,
+    "n_lags": 23,
+    "n_observations": 1413,
+    "critical_values": {
+      "1%": -3.4349863902854607,
+      "5%": -2.863587640846308,
+      "10%": -2.567860154259632
+    },
+    "is_stationary": "True",
+    "interpretation": "Fortemente estacion\u00e1ria (p < 0.01)"
+  },
+  "Volume_MA_20": {
+    "name": "Volume_MA_20",
+    "adf_statistic": -3.4143805813748167,
+    "p_value": 0.01047829892449553,
+    "n_lags": 24,
+    "n_observations": 1412,
+    "critical_values": {
+      "1%": -3.4349896798463924,
+      "5%": -2.8635890925399354,
+      "10%": -2.567860927320659
+    },
+    "is_stationary": "True",
+    "interpretation": "Estacion\u00e1ria (p < 0.05)"
+  },
+  "Volume_Relative_20": {
+    "name": "Volume_Relative_20",
+    "adf_statistic": -10.449053616700894,
+    "p_value": 1.4542745609427792e-18,
+    "n_lags": 19,
+    "n_observations": 1417,
+    "critical_values": {
+      "1%": -3.434973278556316,
+      "5%": -2.8635818545830376,
+      "10%": -2.567857072940785
+    },
+    "is_stationary": "True",
+    "interpretation": "Fortemente estacion\u00e1ria (p < 0.01)"
+  },
+  "VIX": {
+    "name": "VIX",
+    "adf_statistic": -4.273257040451728,
+    "p_value": 0.0004940411485152328,
+    "n_lags": 9,
+    "n_observations": 1427,
+    "critical_values": {
+      "1%": -3.4349408214067227,
+      "5%": -2.8635675309927153,
+      "10%": -2.5678494453155656
+    },
+    "is_stationary": "True",
+    "interpretation": "Fortemente estacion\u00e1ria (p < 0.01)"
+  }
+}

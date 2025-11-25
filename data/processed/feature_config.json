@@ -1,0 +1,46 @@
+{
+  "features": [
+    "Close",
+    "High",
+    "Low",
+    "Open",
+    "Volume",
+    "Return",
+    "Volatility_30d",
+    "Momentum_5d",
+    "Momentum_10d",
+    "Volume_Change",
+    "Volume_Relative_5",
+    "Volume_MA_20",
+    "Volume_Relative_20",
+    "VIX"
+  ],
+  "target_column": "Close",
+  "target_idx": 0,
+  "sequence_length": 60,
+  "use_vix": true,
+  "feature_engineering_config": {
+    "use_moving_averages": false,
+    "use_volume_features": true,
+    "use_volatility": true,
+    "use_momentum": true,
+    "use_returns": true
+  },
+  "data_info": {
+    "train_samples": 1005,
+    "val_samples": 216,
+    "test_samples": 216,
+    "train_period": [
+      "2019-02-15 00:00:00",
+      "2023-02-10 00:00:00"
+    ],
+    "val_period": [
+      "2023-02-13 00:00:00",
+      "2023-12-21 00:00:00"
+    ],
+    "test_period": [
+      "2023-12-22 00:00:00",
+      "2024-10-31 00:00:00"
+    ]
+  }
+}
