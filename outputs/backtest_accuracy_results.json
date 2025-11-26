@@ -1,0 +1,50 @@
+{
+  "backtest_info": {
+    "n_tests": 156,
+    "date": "2025-11-25 02:14:40",
+    "model_path": "models/lstm_model.h5",
+    "scaler_path": "models/scaler.pkl"
+  },
+  "metrics": {
+    "MAE": 32.65181071647055,
+    "RMSE": 44.034555277170185,
+    "MAPE": 0.6020160698771143,
+    "R2": 0.9646169793664487,
+    "Direction_Accuracy": 53.84615384615385
+  },
+  "accuracy_metrics": {
+    "direction_accuracy": 53.84615384615385,
+    "direction_correct": 84,
+    "direction_total": 156,
+    "accuracy_by_percentage": {
+      "within_0.1%": 13.461538461538462,
+      "within_0.5%": 53.84615384615385,
+      "within_1%": 80.12820512820514,
+      "within_2%": 97.43589743589743,
+      "within_5%": 100.0
+    },
+    "accuracy_by_absolute": {
+      "within_10_points": 23.076923076923077,
+      "within_25_points": 52.56410256410257,
+      "within_50_points": 75.0,
+      "within_100_points": 96.15384615384616
+    },
+    "mean_error_pct": 0.6020160698771142,
+    "median_error_pct": 0.429787709828767
+  },
+  "error_statistics": {
+    "mean": 32.65181071647055,
+    "median": 23.584140486391334,
+    "std": 29.54490337425282,
+    "min": 0.16406826288130105,
+    "max": 160.32783445205314,
+    "percentiles": {
+      "p25": 11.112017412288651,
+      "p50": 23.584140486391334,
+      "p75": 50.084566650197075,
+      "p90": 64.28805180949212,
+      "p95": 91.26377887600847,
+      "p99": 124.06664227928657
+    }
+  }
+}

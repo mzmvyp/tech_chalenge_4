@@ -88,7 +88,8 @@ class LSTMStockPredictor:
             units = layer_config['units']
             return_sequences = layer_config.get('return_sequences', False)
             dropout = layer_config.get('dropout', 0.0)
-            use_batch_norm = layer_config.get('batch_normalization', True)  # ✅ Novo: BatchNorm opcional
+            recurrent_dropout = layer_config.get('recurrent_dropout', dropout)  # ✅ NOVO: Suportar recurrent_dropout separado
+            use_batch_norm = layer_config.get('batch_normalization', True)
 
             # ✅ CORREÇÃO: Usar dropout INTERNO da LSTM (mais eficaz)
             # Dropout interno regulariza DENTRO da LSTM, não só entre camadas
@@ -99,8 +100,8 @@ class LSTMStockPredictor:
                     return_sequences=return_sequences,
                     input_shape=(self.sequence_length, self.n_features),
                     dropout=dropout,                    # ✅ Dropout nas entradas
-                    recurrent_dropout=dropout,          # ✅ Dropout recorrente
-                    kernel_regularizer=l1_l2(l1=0.0001, l2=0.0001),  # ✅ Reduzido para evitar underfitting
+                    recurrent_dropout=recurrent_dropout,  # ✅ Dropout recorrente (pode ser diferente)
+                    kernel_regularizer=l1_l2(l1=0.0001, l2=0.0001),
                     recurrent_regularizer=l1_l2(l1=0.0001, l2=0.0001),
                     name=f'lstm_{i+1}'
                 ))
@@ -109,8 +110,8 @@ class LSTMStockPredictor:
                     units=units,
                     return_sequences=return_sequences,
                     dropout=dropout,                    # ✅ Dropout nas entradas
-                    recurrent_dropout=dropout,          # ✅ Dropout recorrente
-                    kernel_regularizer=l1_l2(l1=0.0001, l2=0.0001),  # ✅ Reduzido
+                    recurrent_dropout=recurrent_dropout,  # ✅ Dropout recorrente (pode ser diferente)
+                    kernel_regularizer=l1_l2(l1=0.0001, l2=0.0001),
                     recurrent_regularizer=l1_l2(l1=0.0001, l2=0.0001),
                     name=f'lstm_{i+1}'
                 ))

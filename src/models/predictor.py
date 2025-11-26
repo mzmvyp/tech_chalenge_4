@@ -359,6 +359,6 @@ if __name__ == "__main__":
 
     print("\n⚠️  Este módulo requer modelo e scaler salvos.")
     print("   Execute o treinamento completo primeiro com:")
-    print("   python scripts/train_model.py")
+    print("   python scripts/train_model_stationary.py")
 
     print("\n✅ Estrutura do módulo validada!")

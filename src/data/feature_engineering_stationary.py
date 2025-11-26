@@ -81,14 +81,43 @@ def create_stationary_features(
             ).std()
     
     # ============================================
-    # 3. MOMENTUM (estacionário)
+    # 3. MOMENTUM (estacionário) - MELHORADO
     # ============================================
     if 'Return' in df.columns:
-        for window in [5, 10]:
+        # ✅ MELHORADO: Mais janelas de momentum para melhorar direction accuracy
+        for window in [3, 5, 10, 20]:
             df[f'Momentum_{window}d'] = df['Return'].rolling(
                 window=window,
                 min_periods=window
             ).mean()
+        
+        # ✅ NOVO: Momentum acelerado (diferença entre momentum curto e longo)
+        if 'Momentum_5d' in df.columns and 'Momentum_20d' in df.columns:
+            df['Momentum_Acceleration'] = df['Momentum_5d'] - df['Momentum_20d']
+        
+        # ✅ NOVO: Momentum rate of change (velocidade de mudança)
+        if 'Momentum_10d' in df.columns:
+            df['Momentum_ROC'] = df['Momentum_10d'].pct_change(periods=1)
+        
+        # ✅ NOVO: Momentum strength (força do momentum)
+        if 'Momentum_5d' in df.columns:
+            df['Momentum_Strength'] = df['Momentum_5d'].abs()
+        
+        # ✅ NOVO: Momentum consistency (consistência do sinal)
+        if 'Return' in df.columns:
+            # Quantos dos últimos 5 dias tiveram mesmo sinal
+            returns_sign = np.sign(df['Return'])
+            
+            def calc_consistency(series):
+                if len(series) == 0:
+                    return np.nan
+                last_sign = series.iloc[-1]
+                same_sign_count = (series == last_sign).sum()
+                return same_sign_count / len(series)
+            
+            df['Momentum_Consistency'] = returns_sign.rolling(window=5, min_periods=5).apply(
+                calc_consistency, raw=False
+            )
     
     # ============================================
     # 4. VOLUME FEATURES (estacionário)

@@ -110,7 +110,7 @@ class APIState:
                 print(f"✓ Configuração de features carregada: {len(self.feature_config.get('features', []))} features")
             else:
                 print("⚠️ WARNING: feature_config.json não encontrado. API pode não funcionar corretamente.")
-                print("   Execute o treinamento primeiro: python scripts/train_model.py")
+                print("   Execute o treinamento primeiro: python scripts/train_model_stationary.py")
 
             # Inicializar feature engineer
             self.feature_engineer = FeatureEngineer()
@@ -190,7 +190,7 @@ async def startup_event():
 
     except Exception as e:
         print(f"⚠️  API iniciada mas modelo não foi carregado: {e}")
-        print("   Execute o treinamento primeiro: python scripts/train_model.py")
+        print("   Execute o treinamento primeiro: python scripts/train_model_stationary.py")
         # Fallback para valor padrão
         api_state.min_required_days = 90
 

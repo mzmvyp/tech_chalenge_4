@@ -48,56 +48,61 @@ features:
   # Sentiment analysis (opcional - requer mais recursos)
   use_sentiment: false
 
-# Modelo LSTM
+# Modelo LSTM - OTIMIZADO
 model:
-  # Arquitetura MELHORADA para melhor performance
-  # Aumentada capacidade com melhor regularização
-  sequence_length: 75  # Otimizado: balance entre contexto e eficiência
+  # Arquitetura OTIMIZADA: Balance entre capacidade e regularização
+  # Baseado em análise detalhada do sistema
+  sequence_length: 60  # ✅ OTIMIZADO: Reduzido para melhor eficiência
 
   lstm_layers:
-    - units: 96        # Balanceado: capacidade sem overfitting
+    # ✅ OTIMIZADO: Arquitetura mais eficiente e menos propensa a overfitting
+    - units: 64        # ✅ Reduzido de 96 para 64
       return_sequences: true
-      dropout: 0.3     # Aumentado: mais regularização
+      dropout: 0.25    # ✅ Ajustado para melhor balance
+      recurrent_dropout: 0.25  # ✅ NOVO: Dropout recorrente separado
       batch_normalization: true
-    - units: 48        # Balanceado
+    - units: 32        # ✅ Reduzido de 48 para 32
       return_sequences: true
-      dropout: 0.3     # Aumentado: mais regularização
+      dropout: 0.25
+      recurrent_dropout: 0.25
       batch_normalization: true
-    - units: 24        # Balanceado: camada final
+    - units: 16        # ✅ Reduzido de 24 para 16
       return_sequences: false
-      dropout: 0.3     # Aumentado: mais regularização
+      dropout: 0.25
+      recurrent_dropout: 0.25
       batch_normalization: true
 
   dense_layers:
-    - units: 24        # Balanceado
+    # ✅ OTIMIZADO: Camadas Dense mais simples
+    - units: 16        # ✅ Reduzido de 24 para 16
       activation: "relu"
-      dropout: 0.2     # Aumentado: mais regularização
+      dropout: 0.2
       batch_normalization: true
-    - units: 12        # Balanceado
+    - units: 8         # ✅ Reduzido de 12 para 8
       activation: "relu"
-      dropout: 0.2     # Aumentado: mais regularização
+      dropout: 0.2
       batch_normalization: false
     - units: 1
       activation: null  # Linear para regressão
 
   # Compilação
   optimizer: "adam"
-  learning_rate: 0.0002  # Reduzido: mais conservador para evitar overfitting
+  learning_rate: 0.001  # ✅ OTIMIZADO: Aumentado de 0.0002 para 0.001 (mais agressivo inicialmente)
   loss: "mse"
   metrics: ["mae"]
 
-# Treinamento
+# Treinamento - OTIMIZADO
 training:
-  batch_size: 48  # Otimizado: balance entre generalização e velocidade
+  batch_size: 32  # ✅ OTIMIZADO: Reduzido de 48 para 32 (melhor generalização)
   epochs: 100
   validation_split: 0.0  # Já temos validação separada
 
-  # Early Stopping
+  # Early Stopping - OTIMIZADO
   early_stopping:
     monitor: "val_loss"
-    patience: 20  # Aumentado: dar mais tempo para convergir
+    patience: 15  # ✅ OTIMIZADO: Reduzido de 20 para 15 (mais responsivo)
     restore_best_weights: true
-    min_delta: 0.00005  # Reduzido: detectar melhorias menores
+    min_delta: 0.0001  # ✅ OTIMIZADO: Aumentado de 0.00005 para 0.0001 (menos sensível a ruído)
 
   # Model Checkpoint
   model_checkpoint:
@@ -105,12 +110,13 @@ training:
     save_best_only: true
     mode: "min"
 
-  # ReduceLROnPlateau
+  # ReduceLROnPlateau - OTIMIZADO
   reduce_lr:
     monitor: "val_loss"
     factor: 0.5
-    patience: 5
+    patience: 3  # ✅ OTIMIZADO: Reduzido de 5 para 3 (mais agressivo)
     min_lr: 0.00001
+    cooldown: 2  # ✅ NOVO: Período de espera após redução
 
 # Paths do modelo
 model_paths:

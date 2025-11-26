@@ -46,7 +46,7 @@ def main():
 
     if not features_path.exists():
         print(f"❌ Erro: Features não encontradas em {features_path}")
-        print("   Execute o treinamento primeiro: python scripts/train_model.py")
+        print("   Execute o treinamento primeiro: python scripts/train_model_stationary.py")
         return
 
     print(f"\n📂 Carregando features de: {features_path}")

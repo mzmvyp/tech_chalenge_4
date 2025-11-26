@@ -273,7 +273,7 @@ def run_all_tests():
         print("="*60)
         print("\n🎯 Correções validadas com sucesso!")
         print("   Próximo passo: Re-treinar o modelo")
-        print("   $ python scripts/train_model.py")
+        print("   $ python scripts/train_model_stationary.py")
         return True
     else:
         print(f"❌ ALGUNS TESTES FALHARAM ({passed}/{total})")

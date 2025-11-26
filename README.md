@@ -11,18 +11,27 @@ Sistema de predição de preços de ações usando LSTM com features estacionár
 
 ## 📊 Resultados Atuais
 
-**Teste:**
-- R²: **0.8031** ✅
-- MAE: 81.78
-- RMSE: 103.11
-- MAPE: 1.50%
+**Teste (Último Treinamento):**
+- R²: **0.9646** ✅ (Excelente!)
+- MAE: **32.65** ✅
+- RMSE: **44.03** ✅
+- MAPE: **0.60%** ✅
+- Direction Accuracy: **53.55%** ✅
+
+**Validação:**
+- R²: **0.9504** ✅
+- MAE: **25.88** ✅
+- RMSE: **32.76** ✅
+- MAPE: **0.59%** ✅
+
+✅ **Modelo supera todos os baselines (Naive, MA_5, MA_20)**
 
 ## 🚀 Uso Rápido
 
 ### Treinar Modelo
 
 ```bash
-python scripts/train_model.py
+python scripts/train_model_stationary.py
 ```
 
 ### Usar Online Learning
@@ -49,9 +58,12 @@ result = learner.predict_with_learning(
 
 ```
 ├── scripts/
-│   ├── train_model.py          # Script principal de treinamento
-│   ├── online_learning_demo.py # Demonstração de online learning
-│   └── run_api.py              # API para predições
+│   ├── train_model_stationary.py # Script principal de treinamento
+│   ├── analyze_and_optimize.py   # Análise e otimização do sistema
+│   ├── backtest_model.py         # Backtesting do modelo
+│   ├── evaluate_model.py         # Avaliação do modelo
+│   ├── online_learning_demo.py   # Demonstração de online learning
+│   └── run_api.py                # API para predições
 ├── src/
 │   ├── data/                   # Pipeline de dados
 │   ├── models/                 # Modelos LSTM e online learning
