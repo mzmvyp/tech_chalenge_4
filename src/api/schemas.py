@@ -223,3 +223,37 @@ class SimplePredictionRequest(BaseModel):
                 "days": 200
             }
         }
+
+
+class LoginRequest(BaseModel):
+    """
+    Modelo para request de login (obter JWT token).
+    """
+    api_key: str = Field(..., description="API Key para autenticação")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "api_key": "default-api-key-change-me"
+            }
+        }
+
+
+class LoginResponse(BaseModel):
+    """
+    Modelo para response de login (JWT token).
+    """
+    access_token: str = Field(..., description="JWT access token")
+    token_type: str = Field(default="bearer", description="Tipo do token")
+    expires_in: int = Field(..., description="Tempo de expiração em minutos")
+    expires_at: str = Field(..., description="Data/hora de expiração (ISO format)")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "token_type": "bearer",
+                "expires_in": 1440,
+                "expires_at": "2024-11-28T10:30:00Z"
+            }
+        }

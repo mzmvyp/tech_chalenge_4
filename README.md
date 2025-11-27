@@ -306,6 +306,26 @@ training:
 
 **Nota**: O modelo foi treinado com S&P 500, mas pode ser usado para outras ações. As features são genéricas (Returns, Volatility, Momentum, Volume, indicadores técnicos) e funcionam para qualquer ação. Para melhor performance, recomenda-se retreinar o modelo para cada ação específica.
 
+### Configuração de Autenticação (`.env`)
+
+A autenticação JWT é configurada via variáveis de ambiente:
+
+```bash
+# 1. Gerar chaves secretas
+python scripts/generate_secrets.py
+
+# 2. O script criará/atualizará o arquivo .env com:
+JWT_SECRET_KEY=sua-chave-secreta-jwt-aqui
+API_KEY_1=sua-api-key-aqui
+JWT_EXPIRE_MINUTES=1440  # 24 horas
+```
+
+**Importante:**
+- O arquivo `.env` está no `.gitignore` e não será commitado
+- Use `env.example` como template
+- Em produção, use variáveis de ambiente do sistema ou secrets manager (AWS Secrets Manager, Azure Key Vault, etc.)
+- **NUNCA** compartilhe suas chaves secretas
+
 ### Parâmetros de Error Learning
 
 Configuráveis no código:
@@ -315,21 +335,76 @@ Configuráveis no código:
 
 ## 📡 API REST
 
+### 🔐 Autenticação JWT
+
+A API utiliza autenticação JWT para proteger os endpoints. O fluxo é:
+
+1. **Obter Token**: Envie sua API Key para `/auth/login` e receba um JWT token
+2. **Usar Token**: Inclua o token no header `Authorization: Bearer <token>` em todas as requisições protegidas
+
+**Configuração Inicial:**
+
+```bash
+# 1. Gerar chaves secretas
+python scripts/generate_secrets.py
+
+# 2. Copiar arquivo de exemplo
+cp env.example .env
+
+# 3. Editar .env com as chaves geradas
+# (ou o script já pode ter salvo automaticamente)
+```
+
+**Login (Obter Token):**
+```bash
+POST /auth/login
+Content-Type: application/json
+
+{
+  "api_key": "sua-api-key-aqui"
+}
+```
+
+**Resposta:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "expires_in": 1440,
+  "expires_at": "2024-11-28T10:30:00Z"
+}
+```
+
+**Usar Token nas Requisições:**
+```bash
+# Exemplo com curl
+curl -X POST http://localhost:8000/predict/simple \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -d '{"symbol": "AAPL", "days": 200}'
+```
+
 ### Endpoints
 
-**Health Check:**
-```bash
-GET /health
-```
+**Endpoints Públicos (sem autenticação):**
+- `GET /` - Informações da API
+- `GET /health` - Health check
+- `POST /auth/login` - Obter token JWT
 
-**Informações do Modelo:**
-```bash
-GET /model/info
-```
+**Endpoints Protegidos (requerem autenticação):**
+- `GET /model/info` - Informações do modelo
+- `POST /predict` - Predição única
+- `POST /predict/batch` - Predições em batch
+- `POST /predict/simple` - Predição simplificada
+- `POST /validate-prediction` - Validar predição
+- `POST /validate-by-date` - Validar por data
+- `GET /monitoring/stats` - Estatísticas de monitoramento
+- `GET /monitoring/hourly` - Estatísticas horárias
 
 **Predição Simplificada (Recomendado):**
 ```bash
 POST /predict/simple
+Authorization: Bearer <seu-token>
 Content-Type: application/json
 
 {
@@ -406,16 +481,24 @@ GET /monitoring/stats
 ### Testar API
 
 ```bash
-# Testar endpoints
-python scripts/test_api.py
+# 1. Primeiro, obter token de autenticação
+curl -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"api_key": "sua-api-key-aqui"}'
 
-# Ou manualmente via curl
+# 2. Usar o token nas requisições
+TOKEN="seu-token-aqui"
 curl -X POST http://localhost:8000/predict/simple \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"symbol": "AAPL", "days": 200}'
+
+# Ou usar o script de teste (será atualizado para incluir autenticação)
+python scripts/test_api.py
 
 # Ou acesse a documentação interativa
 # http://localhost:8000/docs
+# (A documentação permite testar com autenticação)
 ```
 
 ## 🐳 Docker

@@ -34,8 +34,19 @@ from .schemas import (
     HealthResponse,
     ErrorResponse,
     StockDataPoint,
-    SimplePredictionRequest
+    SimplePredictionRequest,
+    LoginRequest,
+    LoginResponse
 )
+
+# Imports de autenticação
+from .auth import (
+    verify_api_key,
+    create_access_token,
+    get_current_user,
+    ACCESS_TOKEN_EXPIRE_MINUTES
+)
+from datetime import timedelta
 
 # Imports dos módulos do projeto
 import sys
@@ -251,8 +262,41 @@ async def health_check():
     )
 
 
+@app.post("/auth/login", response_model=LoginResponse, tags=["Authentication"])
+async def login(request: LoginRequest):
+    """
+    Endpoint de login para obter JWT token.
+    
+    Envia uma API Key e recebe um JWT access token válido por 24 horas.
+    
+    **Fluxo:**
+    1. Cliente envia API Key
+    2. API valida a chave
+    3. API retorna JWT token
+    4. Cliente usa o token no header: `Authorization: Bearer <token>`
+    """
+    # Verificar API key
+    api_key_info = verify_api_key(request.api_key)
+    
+    # Criar token JWT
+    expires_delta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": request.api_key, "name": api_key_info["name"], "permissions": api_key_info.get("permissions", [])},
+        expires_delta=expires_delta
+    )
+    
+    expires_at = datetime.utcnow() + expires_delta
+    
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES,
+        expires_at=expires_at.isoformat() + "Z"
+    )
+
+
 @app.get("/model/info", response_model=ModelInfo, tags=["Model"])
-async def get_model_info():
+async def get_model_info(current_user: dict = Depends(get_current_user)):
     """
     Retorna informações sobre o modelo.
 
@@ -288,7 +332,10 @@ async def get_model_info():
 
 
 @app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
-async def predict(request: PredictionRequest):
+async def predict(
+    request: PredictionRequest,
+    current_user: dict = Depends(get_current_user)
+):
     """
     Faz uma predição do preço de fechamento para o próximo dia.
 
@@ -475,7 +522,10 @@ async def predict(request: PredictionRequest):
 
 
 @app.post("/predict/batch", response_model=BatchPredictionResponse, tags=["Prediction"])
-async def predict_batch(request: BatchPredictionRequest):
+async def predict_batch(
+    request: BatchPredictionRequest,
+    current_user: dict = Depends(get_current_user)
+):
     """
     Faz predições em batch para múltiplas sequências.
 
@@ -538,7 +588,10 @@ async def predict_batch(request: BatchPredictionRequest):
 # ============================================
 
 @app.get("/monitoring/stats", tags=["Monitoring"])
-async def get_monitoring_stats(date: str = None):
+async def get_monitoring_stats(
+    date: str = None,
+    current_user: dict = Depends(get_current_user)
+):
     """
     Obtém estatísticas de monitoramento.
 
@@ -565,7 +618,10 @@ async def get_monitoring_stats(date: str = None):
 
 
 @app.get("/monitoring/hourly", tags=["Monitoring"])
-async def get_hourly_stats(date: str = None):
+async def get_monitoring_hourly(
+    date: str = None,
+    current_user: dict = Depends(get_current_user)
+):
     """
     Obtém estatísticas horárias de monitoramento.
 
@@ -656,7 +712,8 @@ async def validate_prediction(
 async def validate_by_date(
     target_date: str = Body(..., description="Data das predições (YYYY-MM-DD)"),
     actual_price: float = Body(..., gt=0, description="Preço real observado"),
-    use_latest: bool = Body(True, description="Se True, valida apenas a última predição do dia")
+    use_latest: bool = Body(True, description="Se True, valida apenas a última predição do dia"),
+    current_user: dict = Depends(get_current_user)
 ):
     """Valida todas as predições de uma data específica."""
     try:
@@ -687,7 +744,10 @@ async def validate_by_date(
 
 
 @app.post("/predict/simple", response_model=PredictionResponse, tags=["Prediction"])
-async def predict_simple(request: SimplePredictionRequest):
+async def predict_simple(
+    request: SimplePredictionRequest,
+    current_user: dict = Depends(get_current_user)
+):
     """
     Faz uma predição de forma SIMPLIFICADA - apenas forneça o símbolo da ação.
     
