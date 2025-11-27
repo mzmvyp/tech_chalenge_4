@@ -106,15 +106,21 @@ class EnsemblePredictor:
             self.feature_names_list.append(feature_names)
             self.target_idx_list.append(target_idx)
             
-            # Sequence length (assumir mesmo para todos)
+            # ✅ CORREÇÃO: Carregar sequence_length do model_info.json (mais confiável)
             if self.sequence_length is None:
                 try:
-                    with open("data/processed/feature_config.json", 'r') as f:
+                    with open("models/model_info.json", 'r') as f:
                         import json
-                        config = json.load(f)
-                        self.sequence_length = config.get('sequence_length', 60)
-                except:
+                        model_info = json.load(f)
+                        model_config = model_info.get('model_config', {})
+                        self.sequence_length = model_config.get('sequence_length', 60)
+                        print(f"   ✓ Sequence length carregado do model_info.json: {self.sequence_length}")
+                except Exception as e:
+                    # ✅ NÃO usar feature_config.json como fallback (pode ter valor errado)
+                    # Usar 60 como padrão (valor correto do modelo atual)
                     self.sequence_length = 60
+                    print(f"   ⚠️  Não foi possível carregar sequence_length do model_info.json: {e}")
+                    print(f"   ⚠️  Usando sequence_length padrão: 60 (valor do modelo atual)")
             
             print(f"   ✓ Modelo {i+1} carregado")
         
@@ -144,8 +150,29 @@ class EnsemblePredictor:
         for i, (model, scaler, feature_names, target_idx) in enumerate(
             zip(self.models, self.scalers, self.feature_names_list, self.target_idx_list)
         ):
+            # ✅ CORREÇÃO: Garantir que sequence_features tem o número correto de linhas
+            # Filtrar features para corresponder ao scaler
+            if feature_names:
+                available_features = [f for f in feature_names if f in sequence_features.columns]
+                if len(available_features) != len(feature_names):
+                    raise ValueError(f"Modelo {i+1}: Features incompatíveis! Esperado {len(feature_names)}, encontrado {len(available_features)}")
+                sequence_features_filtered = sequence_features[available_features]
+            else:
+                sequence_features_filtered = sequence_features
+            
+            # ✅ CORREÇÃO: Verificar se tem linhas suficientes
+            if len(sequence_features_filtered) != self.sequence_length:
+                # ✅ DIAGNÓSTICO: Mostrar informações úteis
+                print(f"   ⚠️  ERRO: Modelo {i+1}: Sequência tem {len(sequence_features_filtered)} linhas, mas esperado {self.sequence_length}")
+                print(f"   📊 Features: {len(feature_names)} esperadas, {len(sequence_features_filtered.columns)} encontradas")
+                raise ValueError(
+                    f"Modelo {i+1}: Sequência tem {len(sequence_features_filtered)} linhas, "
+                    f"mas esperado {self.sequence_length}. "
+                    f"Verifique se sequence_features passado tem exatamente {self.sequence_length} linhas."
+                )
+            
             # Normalizar sequência
-            seq_array = scaler.transform(sequence_features.values)
+            seq_array = scaler.transform(sequence_features_filtered.values)
             seq_array = seq_array.reshape(1, self.sequence_length, len(feature_names))
             
             # Predição
@@ -207,9 +234,10 @@ class AdaptiveThresholdPredictor:
     def __init__(
         self,
         initial_threshold: float = 0.0,
-        learning_rate: float = 0.1,
+        learning_rate: float = 0.0001,  # ✅ MELHORIA: Learning rate mais conservador inicialmente
         min_threshold: float = -0.001,
-        max_threshold: float = 0.001
+        max_threshold: float = 0.001,
+        confidence_threshold: float = 0.0005  # ✅ NOVO: Threshold de confiança mínimo
     ):
         """
         Inicializa predictor com threshold adaptativo.
@@ -224,17 +252,20 @@ class AdaptiveThresholdPredictor:
         self.learning_rate = learning_rate
         self.min_threshold = min_threshold
         self.max_threshold = max_threshold
+        self.confidence_threshold = confidence_threshold  # ✅ NOVO
         
         self.history = []  # Histórico de acertos/erros
         
         print(f"🎯 AdaptiveThresholdPredictor inicializado")
         print(f"   Threshold inicial: {initial_threshold:.6f}")
         print(f"   Learning rate: {learning_rate}")
+        print(f"   Confidence threshold: {confidence_threshold:.6f}")
     
     def predict_direction(
         self,
         predicted_return: float,
-        actual_return: Optional[float] = None
+        actual_return: Optional[float] = None,
+        confidence_threshold: float = 0.0005  # ✅ NOVO: Threshold de confiança mínimo
     ) -> Tuple[int, float]:
         """
         Prediz direção usando threshold adaptativo.
@@ -242,18 +273,35 @@ class AdaptiveThresholdPredictor:
         Args:
             predicted_return: Return predito
             actual_return: Return real (opcional, para aprendizado)
+            confidence_threshold: ✅ NOVO: Retorna "lateral" se confiança < threshold
         
         Returns:
             Tupla (direção, confiança)
         """
+        # ✅ MELHORIA 1: Usar threshold adaptativo mais inteligente
+        # Calcular threshold baseado em histórico recente
+        if len(self.history) > 10:
+            recent_errors = [h['predicted_return'] - h['actual_return'] 
+                           for h in self.history[-20:]]
+            bias = np.mean(recent_errors)
+            # Ajustar threshold para compensar bias
+            dynamic_threshold = self.threshold - bias * 0.5
+        else:
+            dynamic_threshold = self.threshold
+        
         # Aplicar threshold
-        adjusted_return = predicted_return - self.threshold
+        adjusted_return = predicted_return - dynamic_threshold
         
-        # Direção
-        direction = 1 if adjusted_return > 0 else -1
-        
-        # Confiança (distância do threshold)
+        # ✅ MELHORIA 2: Zona de indecisão (lateral) se confiança baixa
         confidence = abs(adjusted_return)
+        if confidence < confidence_threshold:
+            # Se confiança muito baixa, considerar lateral (direção = 0)
+            # Mas para compatibilidade, retornar direção baseada no sinal
+            direction = 1 if adjusted_return >= 0 else -1
+            # Reduzir confiança para indicar incerteza
+            confidence = confidence / 2
+        else:
+            direction = 1 if adjusted_return > 0 else -1
         
         # Se temos valor real, aprender
         if actual_return is not None:
@@ -264,15 +312,29 @@ class AdaptiveThresholdPredictor:
                 'predicted_return': predicted_return,
                 'actual_return': actual_return,
                 'threshold': self.threshold,
-                'correct': correct
+                'correct': correct,
+                'confidence': confidence
             })
             
-            # Ajustar threshold baseado no erro
+            # ✅ MELHORIA 3: Ajustar threshold mais agressivamente quando erra
             if not correct:
                 # Se errou, ajustar threshold na direção do erro
                 error = predicted_return - actual_return
-                self.threshold += self.learning_rate * error
+                # ✅ Aumentar learning rate para erros grandes
+                adaptive_lr = self.learning_rate * (1 + abs(error) * 10)
+                self.threshold += adaptive_lr * error
                 self.threshold = np.clip(self.threshold, self.min_threshold, self.max_threshold)
+            else:
+                # ✅ MELHORIA 4: Ajustar threshold também quando acerta (refinar) - MAS COM CUIDADO
+                # ✅ CORREÇÃO: Reduzir ajuste quando acerta para evitar overfitting
+                if len(self.history) > 30:  # ✅ Aumentar janela para evitar ajustes muito frequentes
+                    # Se acertou consistentemente, ajuste MUITO fino
+                    recent_correct = [h['correct'] for h in self.history[-20:]]  # ✅ Janela maior
+                    if sum(recent_correct) >= 15:  # ✅ 75%+ de acerto recente (mais conservador)
+                        # ✅ Ajuste MUITO fino para evitar overfitting
+                        fine_tune = (predicted_return - actual_return) * 0.05  # ✅ Reduzido de 0.1 para 0.05
+                        self.threshold += fine_tune * self.learning_rate * 0.05  # ✅ Reduzido de 0.1 para 0.05
+                        self.threshold = np.clip(self.threshold, self.min_threshold, self.max_threshold)
         
         return direction, confidence
     

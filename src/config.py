@@ -78,7 +78,7 @@ class Config:
         if self.config['training']['batch_size'] <= 0:
             raise ValueError("batch_size deve ser maior que 0")
 
-        print("✓ Configurações validadas com sucesso!")
+        print("OK: Configuracoes validadas com sucesso!")
 
     def _set_seeds(self):
         """
@@ -101,7 +101,7 @@ class Config:
         os.environ['TF_DETERMINISTIC_OPS'] = '1'
         os.environ['PYTHONHASHSEED'] = str(seeds['python_seed'])
 
-        print(f"✓ Seeds configurados: {seeds}")
+        print(f"OK: Seeds configurados: {seeds}")
 
     def get(self, *keys):
         """
@@ -153,7 +153,7 @@ class Config:
         for directory in directories:
             Path(directory).mkdir(parents=True, exist_ok=True)
 
-        print(f"✓ Diretórios criados/verificados: {directories}")
+        print(f"OK: Diretorios criados/verificados: {directories}")
 
 
 # Instância global de configuração (singleton)
@@ -190,17 +190,17 @@ if __name__ == "__main__":
     print(f"  - Período: {config.get('data', 'start_date')} a {config.get('data', 'end_date')}")
     print(f"  - Split: {config.get('data', 'train_ratio')}/{config.get('data', 'val_ratio')}/{config.get('data', 'test_ratio')}")
 
-    print("\n🧠 Configurações do Modelo:")
+    print("\nConfiguracoes do Modelo:")
     print(f"  - Sequence Length: {config.get('model', 'sequence_length')}")
     print(f"  - LSTM Layers: {len(config.get('model', 'lstm_layers'))}")
     print(f"  - Optimizer: {config.get('model', 'optimizer')}")
 
-    print("\n🏋️ Configurações de Treinamento:")
+    print("\nConfiguracoes de Treinamento:")
     print(f"  - Batch Size: {config.get('training', 'batch_size')}")
     print(f"  - Epochs: {config.get('training', 'epochs')}")
     print(f"  - Early Stopping Patience: {config.get('training', 'early_stopping', 'patience')}")
 
     config.create_directories()
 
-    print("\n✅ Módulo de configuração funcionando corretamente!")
+    print("\nOK: Modulo de configuracao funcionando corretamente!")
     print("=" * 60)

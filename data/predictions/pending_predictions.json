@@ -1,0 +1,18 @@
+[
+  {
+    "prediction_id": "78a2049a-48fe-4c09-aebd-db276a285cbf",
+    "timestamp": "2025-11-27T00:57:47.020643",
+    "date": "2025-11-27",
+    "predicted_price": 4652.469072589087,
+    "predicted_return": 0.0006514919192606065,
+    "direction": "up",
+    "confidence_lower": 4567.1292120266235,
+    "confidence_upper": 4737.80893315155,
+    "validated": false,
+    "input_data_hash": null,
+    "metadata": {
+      "model_version": "1.0.0",
+      "inference_time_ms": 474.0481376647949
+    }
+  }
+]

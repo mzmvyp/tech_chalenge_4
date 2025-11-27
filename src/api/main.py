@@ -14,7 +14,7 @@ Autor: Tech Challenge - Fase 04
 Data: 2024-11-16
 """
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import numpy as np
@@ -22,7 +22,7 @@ import pandas as pd
 from datetime import datetime
 from pathlib import Path
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 # Imports dos schemas
 from .schemas import (
@@ -42,8 +42,11 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from src.models.predictor import StockPredictor
 from src.data.preprocessor import TimeSeriesPreprocessor
-from src.data.feature_engineering import FeatureEngineer
-from src.monitoring.metrics import ModelMonitor  # CORREÇÃO OPUS
+from src.data.feature_engineering_stationary import create_stationary_features
+from src.data.feature_selector import FeatureSelector
+from src.monitoring.metrics import ModelMonitor
+from src.api.prediction_storage import PredictionStorage
+import uuid
 
 
 # ============================================
@@ -78,12 +81,12 @@ class APIState:
     def __init__(self):
         self.predictor: StockPredictor = None
         self.preprocessor: TimeSeriesPreprocessor = None
-        self.feature_engineer: FeatureEngineer = None
-        self.monitor: ModelMonitor = None  # CORREÇÃO OPUS
-        self.feature_config: Dict[str, Any] = {}  # CORREÇÃO OPUS
+        self.monitor: ModelMonitor = None
+        self.feature_config: Dict[str, Any] = {}
         self.model_info: Dict[str, Any] = {}
         self.model_loaded: bool = False
-        self.min_required_days: int = 90  # ✅ Valor padrão, será calculado dinamicamente
+        self.min_required_days: int = 90
+        self.prediction_storage: PredictionStorage = PredictionStorage()
 
     def load_model(
         self,
@@ -111,9 +114,6 @@ class APIState:
             else:
                 print("⚠️ WARNING: feature_config.json não encontrado. API pode não funcionar corretamente.")
                 print("   Execute o treinamento primeiro: python scripts/train_model_stationary.py")
-
-            # Inicializar feature engineer
-            self.feature_engineer = FeatureEngineer()
 
             # Inicializar preprocessor (não precisa de dados, só para processamento)
             sequence_length = self.feature_config.get('sequence_length', 60) if self.feature_config else 60
@@ -334,17 +334,24 @@ async def predict(request: PredictionRequest):
                 detail="Configuração de features não encontrada. Execute o treinamento primeiro."
             )
 
-        # Criar as MESMAS features usadas no treinamento (CORREÇÃO OPUS)
-        fe_config = api_state.feature_config['feature_engineering_config']
-        df_features = api_state.feature_engineer.create_all_features(
-            df_main=df,
-            df_vix=None,  # TODO: buscar VIX atual se necessário
-            use_moving_averages=fe_config.get('use_moving_averages', False),
-            use_volume_features=fe_config.get('use_volume_features', True),
-            use_volatility=fe_config.get('use_volatility', True),
-            use_momentum=fe_config.get('use_momentum', True),
-            use_returns=fe_config.get('use_returns', True)
-        )
+        # Criar VIX simulado se necessário
+        df_vix = None
+        if api_state.feature_config.get('use_vix', False):
+            vix_value = 20.0
+            df_vix = pd.DataFrame({
+                'Open': [vix_value] * len(df),
+                'High': [vix_value * 1.1] * len(df),
+                'Low': [vix_value * 0.9] * len(df),
+                'Close': [vix_value] * len(df),
+                'Volume': [1000000] * len(df)
+            }, index=df.index)
+        
+        # Criar features estacionárias (mesma função do treinamento)
+        df_features = create_stationary_features(df, df_vix)
+        
+        # Aplicar FeatureSelector (mesmo do treinamento)
+        selector = FeatureSelector(correlation_threshold=0.8)
+        df_features = selector.select_features(df_features, verbose=False)
 
         # Verificar se temos features suficientes após criar rolling windows
         sequence_length = api_state.feature_config.get('sequence_length', 60)
@@ -354,18 +361,38 @@ async def predict(request: PredictionRequest):
                 detail=f"Após criar features, apenas {len(df_features)} dias disponíveis. Mínimo: {sequence_length}"
             )
 
-        # Garantir que temos as mesmas features do modelo (CORREÇÃO OPUS)
-        expected_features = api_state.feature_config['features']
+        # ✅ CORREÇÃO CRÍTICA: Usar features do scaler (fonte de verdade)
+        # O scaler tem as features exatas usadas no treinamento (após FeatureSelector)
+        if api_state.predictor.feature_names:
+            expected_features = api_state.predictor.feature_names
+        elif hasattr(api_state.predictor.scaler, 'feature_names_in_'):
+            expected_features = list(api_state.predictor.scaler.feature_names_in_)
+        else:
+            expected_features = api_state.feature_config.get('features', [])
+            if not expected_features:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Nao foi possivel determinar features esperadas. Execute o treinamento primeiro."
+                )
+        
+        # Verificar se número de features corresponde
+        if len(df_features.columns) != len(expected_features):
+            missing_features = set(expected_features) - set(df_features.columns)
+            extra_features = set(df_features.columns) - set(expected_features)
+            
+            if missing_features:
+                # Adicionar features faltantes com valores padrão
+                for feat in missing_features:
+                    if feat == 'VIX' or 'VIX' in feat:
+                        df_features[feat] = 20.0
+                    else:
+                        df_features[feat] = 0.0
+            
+            if extra_features:
+                # Remover features extras (não esperadas pelo scaler)
+                df_features = df_features.drop(columns=list(extra_features))
 
-        # Adicionar features faltantes com valores padrão
-        for feat in expected_features:
-            if feat not in df_features.columns:
-                if feat == 'VIX':
-                    df_features[feat] = 20.0  # VIX médio histórico
-                else:
-                    df_features[feat] = 0.0
-
-        # Reordenar colunas para match com o treinamento (CORREÇÃO OPUS - CRÍTICO!)
+        # Reordenar colunas para match com o treinamento (CRÍTICO!)
         df_features = df_features[expected_features]
 
         # Normalizar dados
@@ -374,29 +401,67 @@ async def predict(request: PredictionRequest):
         # Pegar últimos N dias para formar a sequência
         sequence = data_scaled[-sequence_length:]
 
-        # Fazer predição
-        prediction = api_state.predictor.predict_single(sequence, return_scaled=False)
+        # Fazer predição (modelo prediz Return)
+        prediction_return = api_state.predictor.predict_single(sequence, return_scaled=False)
+        
+        # Converter Return para Close
+        last_close = float(df['Close'].iloc[-1])
+        prediction_close = last_close * (1 + prediction_return)
+        
+        # Calcular direção
+        if prediction_return > 0:
+            direction = "up"
+        elif prediction_return < 0:
+            direction = "down"
+        else:
+            direction = "sideways"
+        
+        # Calcular intervalo de confiança
+        if 'Return' in df_features.columns:
+            recent_volatility = df_features['Return'].tail(30).std() * np.sqrt(1)
+        else:
+            recent_volatility = 0.01
+        
+        confidence_interval = float(prediction_close) * recent_volatility * 1.96
 
-        # Calcular intervalo de confiança baseado em volatilidade histórica
-        recent_volatility = df_features['Close'].pct_change().std() * np.sqrt(1)  # 1 dia
-        confidence_interval = float(prediction) * recent_volatility * 1.96
+        # Gerar ID único e salvar predição
+        prediction_id = str(uuid.uuid4())
+        prediction_timestamp = datetime.utcnow()
+        
+        api_state.prediction_storage.save_prediction(
+            prediction_id=prediction_id,
+            timestamp=prediction_timestamp,
+            predicted_price=float(prediction_close),
+            predicted_return=float(prediction_return),
+            direction=direction,
+            confidence_lower=float(prediction_close - confidence_interval),
+            confidence_upper=float(prediction_close + confidence_interval),
+            metadata={
+                "model_version": "1.0.0",
+                "inference_time_ms": float((time.time() - start_time) * 1000)
+            }
+        )
 
-        # Registrar no monitoramento (CORREÇÃO OPUS)
+        # Registrar no monitoramento
         inference_time = time.time() - start_time
         if api_state.monitor:
             api_state.monitor.log_prediction(
                 input_shape=sequence.shape,
-                prediction=float(prediction),
+                prediction=float(prediction_close),
                 inference_time=inference_time,
-                timestamp=datetime.utcnow()
+                timestamp=prediction_timestamp
             )
 
         return PredictionResponse(
-            prediction=float(prediction),
-            confidence_lower=float(prediction - confidence_interval),
-            confidence_upper=float(prediction + confidence_interval),
+            prediction=float(prediction_close),
+            confidence_lower=float(prediction_close - confidence_interval),
+            confidence_upper=float(prediction_close + confidence_interval),
+            direction=direction,
+            predicted_return=float(prediction_return),
+            prediction_id=prediction_id,
             model_version="1.0.0",
-            timestamp=datetime.utcnow().isoformat() + "Z"
+            timestamp=prediction_timestamp.isoformat() + "Z",
+            inference_time_ms=float((time.time() - start_time) * 1000)
         )
 
     except HTTPException:
@@ -545,3 +610,76 @@ if __name__ == "__main__":
         reload=True,
         log_level="info"
     )
+
+
+@app.post("/validate-prediction", tags=["Validation"], response_model=Dict[str, Any])
+async def validate_prediction(
+    prediction_id: str = Body(..., description="ID da predição a validar"),
+    actual_price: float = Body(..., gt=0, description="Preço real observado"),
+    actual_date: Optional[str] = Body(None, description="Data do valor real (YYYY-MM-DD)")
+):
+    """Valida uma predição com o valor real observado."""
+    try:
+        actual_date_obj = None
+        if actual_date:
+            actual_date_obj = datetime.strptime(actual_date, "%Y-%m-%d").date()
+        
+        result = api_state.prediction_storage.validate_prediction(
+            prediction_id=prediction_id,
+            actual_price=actual_price,
+            actual_date=actual_date_obj
+        )
+        
+        if result is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Predicao {prediction_id} nao encontrada"
+            )
+        
+        return {
+            "success": True,
+            "prediction_id": prediction_id,
+            "validation": result,
+            "message": "Predicao validada com sucesso"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao validar predicao: {str(e)}"
+        )
+
+
+@app.post("/validate-by-date", tags=["Validation"], response_model=Dict[str, Any])
+async def validate_by_date(
+    target_date: str = Body(..., description="Data das predições (YYYY-MM-DD)"),
+    actual_price: float = Body(..., gt=0, description="Preço real observado"),
+    use_latest: bool = Body(True, description="Se True, valida apenas a última predição do dia")
+):
+    """Valida todas as predições de uma data específica."""
+    try:
+        target_date_obj = datetime.strptime(target_date, "%Y-%m-%d").date()
+        
+        validations = api_state.prediction_storage.validate_by_date(
+            target_date=target_date_obj,
+            actual_price=actual_price,
+            use_latest=use_latest
+        )
+        
+        return {
+            "success": True,
+            "target_date": target_date,
+            "validations_count": len(validations),
+            "validations": validations
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Formato de data invalido. Use YYYY-MM-DD: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao validar por data: {str(e)}"
+        )

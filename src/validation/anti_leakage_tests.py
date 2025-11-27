@@ -310,7 +310,7 @@ class AntiLeakageValidator:
         # ✅ AJUSTE: No strict mode, aceitar se modelo é melhor (mesmo que pouco)
         if not self.strict_mode:
             return is_better
-        
+
         return passed
 
     def test_scaler_fit_on_train_only(

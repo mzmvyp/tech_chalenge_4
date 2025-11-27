@@ -41,8 +41,8 @@ class FeatureSelector:
             'VIX', 'Return'  # Features importantes
         ]
 
-        print(f"🔍 FeatureSelector inicializado")
-        print(f"   Threshold de correlação: {correlation_threshold}")
+        print(f"FeatureSelector inicializado")
+        print(f"   Threshold de correlacao: {correlation_threshold}")
         print(f"   Features protegidas: {self.features_to_keep}")
 
     def select_features(self, df: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
@@ -64,9 +64,9 @@ class FeatureSelector:
         """
         if verbose:
             print("\n" + "="*60)
-            print("🔍 SELEÇÃO DE FEATURES (Anti-Multicolinearidade)")
+            print("SELECAO DE FEATURES (Anti-Multicolinearidade)")
             print("="*60)
-            print(f"📊 Features originais: {len(df.columns)}")
+            print(f"Features originais: {len(df.columns)}")
 
         # Calcular matriz de correlação
         corr_matrix = df.corr().abs()
@@ -117,15 +117,15 @@ class FeatureSelector:
         self.dropped_features = to_drop
 
         if verbose:
-            print(f"❌ Features removidas: {len(to_drop)}")
-            print(f"✅ Features mantidas: {len(df.columns) - len(to_drop)}")
+            print(f"Features removidas: {len(to_drop)}")
+            print(f"Features mantidas: {len(df.columns) - len(to_drop)}")
 
             if to_drop:
                 print(f"\n📋 Removidas (correlação > {self.correlation_threshold}):")
                 for feat in sorted(to_drop):
                     if feat in correlations_found:
                         corr_with = correlations_found[feat]
-                        print(f"   ❌ {feat}")
+                        print(f"   - {feat}")
                         print(f"      Correlacionado com: {corr_with}")
 
         # Remover features
@@ -133,7 +133,7 @@ class FeatureSelector:
         self.selected_features = df_selected.columns.tolist()
 
         if verbose:
-            print(f"\n✅ Features finais: {len(self.selected_features)}")
+            print(f"\nFeatures finais: {len(self.selected_features)}")
             print(f"   {self.selected_features}")
             print("="*60)
 
@@ -194,13 +194,13 @@ class FeatureSelector:
             top_n: Número de maiores correlações para exibir
         """
         print("\n" + "="*60)
-        print("📊 ANÁLISE DE CORRELAÇÕES")
+        print("ANALISE DE CORRELACOES")
         print("="*60)
 
         high_corrs = self.get_high_correlations(df)
 
         if not high_corrs:
-            print("✅ Nenhuma correlação alta encontrada!")
+            print("OK: Nenhuma correlacao alta encontrada!")
             return
 
         print(f"\nTop {top_n} correlações mais altas:")
@@ -243,7 +243,7 @@ if __name__ == "__main__":
     # Selecionar features
     df_selected = selector.select_features(df_test)
 
-    print(f"\n✅ Teste concluído!")
+    print(f"\nOK: Teste concluido!")
     print(f"   Features originais: {len(df_test.columns)}")
     print(f"   Features selecionadas: {len(df_selected.columns)}")
     print(f"   Redução: {(1 - len(df_selected.columns)/len(df_test.columns))*100:.1f}%")

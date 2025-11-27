@@ -1,468 +1,469 @@
 {
   "backtest_info": {
     "n_tests": 156,
-    "date": "2025-11-25 02:33:37",
+    "date": "2025-11-26 20:23:37",
     "immediate_learn": true,
-    "use_ensemble": false,
+    "use_ensemble": true,
     "use_adaptive_threshold": true,
-    "learning_events": 72
+    "learning_events": 71
   },
   "metrics": {
-    "MAE": 32.621891700104534,
-    "RMSE": 43.94835849755482,
-    "MAPE": 0.6009327842765896,
-    "R2": 0.9647553669282333,
+    "MAE": 32.65216082889287,
+    "RMSE": 43.99905315725911,
+    "MAPE": 0.6017016603514858,
+    "R2": 0.96467401029816,
     "Direction_Accuracy": 43.58974358974359
   },
-  "direction_accuracy": 43.58974358974359,
+  "direction_accuracy": 48.717948717948715,
   "error_statistics": {
-    "total_errors": 71,
-    "buffer_size": 21,
-    "mean_error_pct": 1.069368185607246,
-    "median_error_pct": 0.9235558861369814,
-    "max_error_pct": 3.0480650129087006,
-    "min_error_pct": 0.5047573351386662,
-    "std_error_pct": 0.4804569466364425,
+    "total_errors": 70,
+    "buffer_size": 20,
+    "mean_error_pct": 1.0783536187846499,
+    "median_error_pct": 0.9554319049559178,
+    "max_error_pct": 3.061509196535342,
+    "min_error_pct": 0.5130530371732478,
+    "std_error_pct": 0.48182727069256676,
     "errors_above_threshold": 18
   },
   "threshold_statistics": {
-    "current_threshold": -5.361774473019764e-05,
-    "total_predictions": 156,
-    "accuracy": 43.58974358974359,
-    "correct_predictions": 68
+    "current_threshold": -0.0008924395359865748,
+    "total_predictions": 166,
+    "accuracy": 48.19277108433735,
+    "correct_predictions": 80
   },
   "learning_events": [
     {
       "test_number": 4,
       "date": "2024-03-27 00:00:00",
-      "error_pct": 0.8638418951495949,
+      "error_pct": 0.8588493190121249,
       "type": "immediate"
     },
     {
       "test_number": 7,
       "date": "2024-04-02 00:00:00",
-      "error_pct": 0.7210706129892263,
+      "error_pct": 0.7262610195750692,
       "type": "immediate"
     },
     {
       "test_number": 9,
       "date": "2024-04-04 00:00:00",
-      "error_pct": 1.241217868523808,
+      "error_pct": 1.2458896074102426,
       "type": "immediate"
     },
     {
       "test_number": 10,
       "date": "2024-04-05 00:00:00",
-      "error_pct": 1.1052915576085458,
+      "error_pct": 1.1007419477094789,
       "type": "immediate"
     },
     {
       "test_number": 13,
       "date": "2024-04-10 00:00:00",
-      "error_pct": 0.8784014543797246,
+      "error_pct": 0.9519318559243791,
       "type": "immediate"
     },
     {
       "test_number": 14,
       "date": "2024-04-11 00:00:00",
-      "error_pct": 0.8979665826984087,
+      "error_pct": 0.7852156982088755,
       "type": "immediate"
     },
     {
       "test_number": 15,
       "date": "2024-04-12 00:00:00",
-      "error_pct": 1.2473499289305512,
+      "error_pct": 1.3592340255510822,
       "type": "immediate"
     },
     {
       "test_number": 16,
       "date": "2024-04-15 00:00:00",
-      "error_pct": 0.9715038984647801,
+      "error_pct": 1.087619709591054,
       "type": "immediate"
     },
     {
       "test_number": 20,
       "date": "2024-04-19 00:00:00",
-      "error_pct": 0.8087303041905515,
+      "error_pct": 0.8366493424587615,
       "type": "immediate"
     },
     {
       "test_number": 21,
       "date": "2024-04-22 00:00:00",
-      "error_pct": 0.8830571598479722,
+      "error_pct": 0.8761952618688525,
       "type": "immediate"
     },
     {
       "test_number": 22,
       "date": "2024-04-23 00:00:00",
-      "error_pct": 1.2027308950785784,
+      "error_pct": 1.1958569419216147,
       "type": "immediate"
     },
     {
       "test_number": 25,
       "date": "2024-04-26 00:00:00",
-      "error_pct": 1.0318987295211992,
+      "error_pct": 1.025572578649835,
       "type": "immediate"
     },
     {
       "test_number": 27,
       "date": "2024-04-30 00:00:00",
-      "error_pct": 1.5770596116533844,
+      "error_pct": 1.5834075646890746,
       "type": "immediate"
     },
     {
       "test_number": 29,
       "date": "2024-05-02 00:00:00",
-      "error_pct": 0.9235558861369814,
+      "error_pct": 0.9172696559495649,
       "type": "immediate"
     },
     {
       "test_number": 30,
       "date": "2024-05-03 00:00:00",
-      "error_pct": 1.2578908411398215,
+      "error_pct": 1.25190889277409,
       "type": "immediate"
     },
     {
       "test_number": 31,
       "date": "2024-05-06 00:00:00",
-      "error_pct": 1.0394261738926802,
+      "error_pct": 1.0324200608131635,
       "type": "immediate"
     },
     {
       "test_number": 34,
       "date": "2024-05-09 00:00:00",
-      "error_pct": 0.5181328870453656,
+      "error_pct": 0.5130530371732478,
       "type": "immediate"
     },
     {
       "test_number": 38,
       "date": "2024-05-15 00:00:00",
-      "error_pct": 1.1655165353887929,
+      "error_pct": 1.1616444232469194,
       "type": "immediate"
     },
     {
       "test_number": 44,
       "date": "2024-05-23 00:00:00",
-      "error_pct": 0.7327755929158966,
+      "error_pct": 0.7376459825964266,
       "type": "immediate"
     },
     {
       "test_number": 45,
       "date": "2024-05-24 00:00:00",
-      "error_pct": 0.7070959292276523,
+      "error_pct": 0.7020649208397322,
       "type": "immediate"
     },
     {
       "test_number": 47,
       "date": "2024-05-29 00:00:00",
-      "error_pct": 0.7272919839230552,
+      "error_pct": 0.7336121123224332,
       "type": "immediate"
     },
     {
       "test_number": 48,
       "date": "2024-05-30 00:00:00",
-      "error_pct": 0.5837923947204441,
+      "error_pct": 0.5911286466184665,
       "type": "immediate"
     },
     {
       "test_number": 49,
       "date": "2024-05-31 00:00:00",
-      "error_pct": 0.8146834159932914,
+      "error_pct": 0.8076891245973161,
       "type": "immediate"
     },
     {
       "test_number": 52,
       "date": "2024-06-05 00:00:00",
-      "error_pct": 1.1975608211599773,
+      "error_pct": 1.1898855721279755,
       "type": "immediate"
     },
     {
       "test_number": 57,
       "date": "2024-06-12 00:00:00",
-      "error_pct": 0.8641168306691288,
+      "error_pct": 0.8584997911783665,
       "type": "immediate"
     },
     {
       "test_number": 60,
       "date": "2024-06-17 00:00:00",
-      "error_pct": 0.7744028777704534,
+      "error_pct": 0.7681997771328908,
       "type": "immediate"
     },
     {
       "test_number": 70,
       "date": "2024-07-02 00:00:00",
-      "error_pct": 0.6302349249139233,
+      "error_pct": 0.6254720178323872,
       "type": "immediate"
     },
     {
       "test_number": 71,
       "date": "2024-07-03 00:00:00",
-      "error_pct": 0.520369363517532,
+      "error_pct": 0.5152894807768116,
       "type": "immediate"
     },
     {
       "test_number": 72,
       "date": "2024-07-05 00:00:00",
-      "error_pct": 0.5564331855954525,
+      "error_pct": 0.5511334779394136,
       "type": "immediate"
     },
     {
       "test_number": 75,
       "date": "2024-07-10 00:00:00",
-      "error_pct": 1.0253396969019264,
+      "error_pct": 1.0198569429201756,
       "type": "immediate"
     },
     {
       "test_number": 76,
       "date": "2024-07-11 00:00:00",
-      "error_pct": 0.8686757832236807,
+      "error_pct": 0.8743765348462826,
       "type": "immediate"
     },
     {
       "test_number": 77,
       "date": "2024-07-12 00:00:00",
-      "error_pct": 0.5641543428673359,
+      "error_pct": 0.5583939618621171,
       "type": "immediate"
     },
     {
       "test_number": 79,
       "date": "2024-07-16 00:00:00",
-      "error_pct": 0.6527153054628579,
+      "error_pct": 0.6459285541359843,
       "type": "immediate"
     },
     {
       "test_number": 80,
       "date": "2024-07-17 00:00:00",
-      "error_pct": 1.392719587672505,
+      "error_pct": 1.3999638938062424,
       "type": "immediate"
     },
     {
       "test_number": 81,
       "date": "2024-07-18 00:00:00",
-      "error_pct": 0.7652634570969651,
+      "error_pct": 0.7743679990230431,
       "type": "immediate"
     },
     {
       "test_number": 82,
       "date": "2024-07-19 00:00:00",
-      "error_pct": 0.6949464612474554,
+      "error_pct": 0.7046784672623881,
       "type": "immediate"
     },
     {
       "test_number": 83,
       "date": "2024-07-22 00:00:00",
-      "error_pct": 1.0938441659114355,
+      "error_pct": 1.0834822163693751,
       "type": "immediate"
     },
     {
       "test_number": 85,
       "date": "2024-07-24 00:00:00",
-      "error_pct": 2.3390239015210295,
+      "error_pct": 2.3506819689954805,
       "type": "immediate"
     },
     {
       "test_number": 87,
       "date": "2024-07-26 00:00:00",
-      "error_pct": 1.1328167452580014,
+      "error_pct": 1.1205722437366368,
       "type": "immediate"
     },
     {
       "test_number": 90,
       "date": "2024-07-31 00:00:00",
-      "error_pct": 1.593560745286322,
+      "error_pct": 1.5820148591663257,
       "type": "immediate"
     },
     {
       "test_number": 91,
       "date": "2024-08-01 00:00:00",
-      "error_pct": 1.3479666774037327,
+      "error_pct": 1.3604814134559118,
       "type": "immediate"
     },
     {
       "test_number": 92,
       "date": "2024-08-02 00:00:00",
-      "error_pct": 1.832379399116451,
+      "error_pct": 1.8448501145681597,
       "type": "immediate"
     },
     {
       "test_number": 93,
       "date": "2024-08-05 00:00:00",
-      "error_pct": 3.0480650129087006,
+      "error_pct": 3.061509196535342,
       "type": "immediate"
     },
     {
       "test_number": 94,
       "date": "2024-08-06 00:00:00",
-      "error_pct": 1.0644633858239276,
+      "error_pct": 1.0515444103470737,
       "type": "immediate"
     },
     {
       "test_number": 95,
       "date": "2024-08-07 00:00:00",
-      "error_pct": 0.7396249741594464,
+      "error_pct": 0.752579234748372,
       "type": "immediate"
     },
     {
       "test_number": 96,
       "date": "2024-08-08 00:00:00",
-      "error_pct": 2.291166070915959,
-      "type": "immediate"
-    },
-    {
-      "test_number": 97,
-      "date": "2024-08-09 00:00:00",
-      "error_pct": 0.5047573351386662,
+      "error_pct": 2.278374959255519,
       "type": "immediate"
     },
     {
       "test_number": 99,
       "date": "2024-08-13 00:00:00",
-      "error_pct": 1.6956102317473747,
+      "error_pct": 1.6802512985385403,
       "type": "immediate"
     },
     {
       "test_number": 101,
       "date": "2024-08-15 00:00:00",
-      "error_pct": 1.6225701960579826,
+      "error_pct": 1.6073909736178296,
       "type": "immediate"
     },
     {
       "test_number": 103,
       "date": "2024-08-19 00:00:00",
-      "error_pct": 0.988030017490216,
+      "error_pct": 0.978046831535752,
       "type": "immediate"
-    },
-    {
-      "test_number": 103,
-      "date": "2024-08-19 00:00:00",
-      "errors_learned": 50,
-      "type": "batch"
     },
     {
       "test_number": 106,
       "date": "2024-08-22 00:00:00",
-      "error_pct": 0.8700760340924245,
+      "error_pct": 0.890481204726698,
       "type": "immediate"
+    },
+    {
+      "test_number": 106,
+      "date": "2024-08-22 00:00:00",
+      "errors_learned": 50,
+      "type": "batch"
     },
     {
       "test_number": 107,
       "date": "2024-08-23 00:00:00",
-      "error_pct": 1.163681353268267,
+      "error_pct": 1.1443113048264852,
       "type": "immediate"
     },
     {
       "test_number": 110,
       "date": "2024-08-28 00:00:00",
-      "error_pct": 0.5808905005701008,
+      "error_pct": 0.596096005224682,
       "type": "immediate"
     },
     {
       "test_number": 112,
       "date": "2024-08-30 00:00:00",
-      "error_pct": 1.0170191151212256,
+      "error_pct": 1.0033251690629168,
       "type": "immediate"
     },
     {
       "test_number": 113,
       "date": "2024-09-03 00:00:00",
-      "error_pct": 2.1423942196712837,
+      "error_pct": 2.156466717584531,
       "type": "immediate"
     },
     {
       "test_number": 116,
       "date": "2024-09-06 00:00:00",
-      "error_pct": 1.7356011934882547,
+      "error_pct": 1.7511160716028207,
       "type": "immediate"
     },
     {
       "test_number": 117,
       "date": "2024-09-09 00:00:00",
-      "error_pct": 1.1667312082109291,
+      "error_pct": 1.1510178394902224,
       "type": "immediate"
     },
     {
       "test_number": 119,
       "date": "2024-09-11 00:00:00",
-      "error_pct": 1.0794879514408309,
+      "error_pct": 1.0630937509403204,
       "type": "immediate"
     },
     {
       "test_number": 120,
       "date": "2024-09-12 00:00:00",
-      "error_pct": 0.7686883628048191,
+      "error_pct": 0.752166738564747,
       "type": "immediate"
     },
     {
       "test_number": 121,
       "date": "2024-09-13 00:00:00",
-      "error_pct": 0.562559510307679,
+      "error_pct": 0.5460960511795419,
       "type": "immediate"
     },
     {
       "test_number": 125,
       "date": "2024-09-19 00:00:00",
-      "error_pct": 1.6891426220209755,
+      "error_pct": 1.6750492140043045,
       "type": "immediate"
     },
     {
       "test_number": 133,
       "date": "2024-10-01 00:00:00",
-      "error_pct": 0.9217194814753271,
+      "error_pct": 0.9337766442396964,
       "type": "immediate"
     },
     {
       "test_number": 136,
       "date": "2024-10-04 00:00:00",
-      "error_pct": 0.9112841782463804,
+      "error_pct": 0.8976456787105966,
       "type": "immediate"
     },
     {
       "test_number": 137,
       "date": "2024-10-07 00:00:00",
-      "error_pct": 0.944576291154027,
+      "error_pct": 0.9589319539874565,
       "type": "immediate"
     },
     {
       "test_number": 138,
       "date": "2024-10-08 00:00:00",
-      "error_pct": 0.9829510063628468,
+      "error_pct": 0.9683535104752147,
       "type": "immediate"
     },
     {
       "test_number": 139,
       "date": "2024-10-09 00:00:00",
-      "error_pct": 0.7303119189387877,
+      "error_pct": 0.7149803100829093,
       "type": "immediate"
     },
     {
       "test_number": 141,
       "date": "2024-10-11 00:00:00",
-      "error_pct": 0.6252823705529185,
+      "error_pct": 0.6093269515235599,
       "type": "immediate"
     },
     {
       "test_number": 142,
       "date": "2024-10-14 00:00:00",
-      "error_pct": 0.7874847535438587,
+      "error_pct": 0.7717160570180592,
       "type": "immediate"
     },
     {
       "test_number": 143,
       "date": "2024-10-15 00:00:00",
-      "error_pct": 0.7461186864706159,
+      "error_pct": 0.7609154549022634,
       "type": "immediate"
     },
     {
       "test_number": 149,
       "date": "2024-10-23 00:00:00",
-      "error_pct": 0.9177756092448148,
+      "error_pct": 0.9267038349506129,
       "type": "immediate"
     },
     {
       "test_number": 155,
       "date": "2024-10-31 00:00:00",
-      "error_pct": 1.8802711748693488,
+      "error_pct": 1.8934949306116584,
       "type": "immediate"
     }
-  ]
+  ],
+  "accuracy_evolution": {
+    "first_half": 39.743589743589745,
+    "second_half": 57.692307692307686,
+    "improvement": 17.948717948717942
+  },
+  "test_start_idx": 1222,
+  "test_start_ratio": 0.8497913769123783
 }

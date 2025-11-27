@@ -82,16 +82,33 @@ class ErrorFocusedLearner:
             raise FileNotFoundError(f"Modelo não encontrado: {self.model_path}")
         
         print(f"\n📂 Carregando modelo de: {self.model_path}")
-        self.model = tf.keras.models.load_model(self.model_path, compile=False)
         
-        from tensorflow.keras.optimizers import Adam
-        self.model.compile(
-            optimizer=Adam(learning_rate=0.00001),  # Learning rate conservador
-            loss='mse',
-            metrics=['mae']
-        )
+        # ✅ CORREÇÃO CRÍTICA: Carregar com compile=True primeiro para preservar estado do otimizador
+        # Se falhar, tentar com compile=False
+        try:
+            self.model = tf.keras.models.load_model(self.model_path, compile=True)
+            print(f"✓ Modelo carregado (com otimizador preservado)")
+        except:
+            # Se não conseguir carregar com compile=True, carregar sem e recompilar
+            self.model = tf.keras.models.load_model(self.model_path, compile=False)
+            from tensorflow.keras.optimizers import Adam
+            self.model.compile(
+                optimizer=Adam(learning_rate=0.00001),  # Learning rate conservador
+                loss='mse',
+                metrics=['mae']
+            )
+            print(f"✓ Modelo carregado (recompilado)")
         
-        print(f"✓ Modelo carregado")
+        # ✅ VALIDAÇÃO: Verificar se os pesos foram carregados corretamente
+        # Pegar um peso aleatório para verificar
+        try:
+            sample_weight = self.model.layers[0].get_weights()[0]
+            if sample_weight is not None and len(sample_weight) > 0:
+                print(f"   ✓ Pesos validados: shape {sample_weight.shape}")
+            else:
+                print(f"   ⚠️  Aviso: Pesos podem estar vazios")
+        except Exception as e:
+            print(f"   ⚠️  Aviso: Não foi possível validar pesos: {e}")
         
         # Carregar scaler
         scaler_data = joblib.load(self.scaler_path)
@@ -277,14 +294,25 @@ class ErrorFocusedLearner:
         if verbose:
             print(f"\n🔄 Retreinando modelo focando em erros...")
         
+        # ✅ CORREÇÃO: Reduzir learning rate e epochs para evitar overfitting
+        original_lr = float(self.model.optimizer.learning_rate.numpy())
+        reduced_lr = original_lr * 0.1  # 10% do learning rate original
+        self.model.optimizer.learning_rate.assign(reduced_lr)
+        
+        # ✅ Reduzir epochs para evitar overfitting
+        adjusted_epochs = min(epochs, 3)  # Máximo 3 épocas
+        
         history = self.model.fit(
             X_errors,
             y_errors,
             sample_weight=sample_weights,  # ✅ Peso maior para erros maiores
-            epochs=epochs,
+            epochs=adjusted_epochs,  # ✅ Reduzido
             batch_size=batch_size,
             verbose=1 if verbose else 0
         )
+        
+        # ✅ Restaurar learning rate original
+        self.model.optimizer.learning_rate.assign(original_lr)
         
         print(f"\n✅ Aprendizado de erros concluído!")
         print(f"   Loss final: {history.history['loss'][-1]:.6f}")
@@ -363,6 +391,11 @@ class ErrorFocusedLearner:
             
             # Uma época de aprendizado focado neste erro
             try:
+                # ✅ CORREÇÃO: Reduzir learning rate para aprendizado incremental
+                original_lr = float(self.model.optimizer.learning_rate.numpy())
+                reduced_lr = original_lr * 0.05  # 5% do learning rate original (muito conservador)
+                self.model.optimizer.learning_rate.assign(reduced_lr)
+                
                 self.model.fit(
                     seq_array,
                     np.array([actual_return]),
@@ -370,6 +403,9 @@ class ErrorFocusedLearner:
                     epochs=1,
                     verbose=0
                 )
+                
+                # ✅ Restaurar learning rate original
+                self.model.optimizer.learning_rate.assign(original_lr)
             except Exception as e:
                 print(f"   ⚠️  Erro no aprendizado imediato: {e}")
             
@@ -403,8 +439,19 @@ class ErrorFocusedLearner:
         if filepath is None:
             filepath = self.model_path
         
-        self.model.save(filepath)
-        print(f"💾 Modelo salvo em: {filepath}")
+        # ✅ CORREÇÃO: Salvar modelo completo (incluindo otimizador) para preservar estado
+        # Isso garante que o estado do otimizador (momentum, etc.) seja preservado
+        try:
+            # Tentar salvar com otimizador (melhor para continuidade)
+            self.model.save(filepath, save_format='h5')
+            print(f"💾 Modelo salvo em: {filepath} (com otimizador)")
+        except Exception as e:
+            # Se falhar, salvar apenas pesos
+            print(f"⚠️  Aviso: Erro ao salvar com otimizador: {e}")
+            print(f"   Salvando apenas pesos...")
+            self.model.save_weights(filepath.replace('.h5', '_weights.h5'))
+            self.model.save(filepath)
+            print(f"💾 Modelo salvo em: {filepath}")
 
 
 if __name__ == "__main__":

@@ -54,8 +54,27 @@ class StockPredictor:
         if not Path(self.model_path).exists():
             raise FileNotFoundError(f"Modelo não encontrado: {self.model_path}")
 
-        self.model = tf.keras.models.load_model(self.model_path)
-        print(f"✓ Modelo carregado de: {self.model_path}")
+        # ✅ CORREÇÃO: Carregar com compile=False para evitar problemas de deserialização
+        # Se falhar, tentar com compile=True (versões antigas)
+        try:
+            self.model = tf.keras.models.load_model(self.model_path, compile=False)
+            # Recompilar manualmente para garantir compatibilidade
+            self.model.compile(
+                optimizer='adam',
+                loss='mse',
+                metrics=['mae']
+            )
+            print(f"✓ Modelo carregado de: {self.model_path} (recompilado)")
+        except Exception as e:
+            # Fallback: tentar carregar com compile=True (pode funcionar em algumas versões)
+            try:
+                self.model = tf.keras.models.load_model(self.model_path, compile=True)
+                print(f"✓ Modelo carregado de: {self.model_path} (com otimizador preservado)")
+            except Exception as e2:
+                raise RuntimeError(
+                    f"Erro ao carregar modelo: {e2}\n"
+                    f"Tente retreinar o modelo: python scripts/train_model_stationary.py"
+                ) from e2
 
     def load_scaler(self):
         """

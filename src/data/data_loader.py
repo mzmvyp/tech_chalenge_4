@@ -49,7 +49,7 @@ class DataLoader:
         self.interval = interval
         self.vix_symbol = vix_symbol
 
-        print(f"📥 DataLoader inicializado:")
+        print(f"DataLoader inicializado:")
         print(f"   Symbol: {symbol}")
         print(f"   Período: {start_date} a {end_date}")
         print(f"   Intervalo: {interval}")
@@ -69,7 +69,7 @@ class DataLoader:
         Raises:
             ValueError: Se não conseguir baixar os dados
         """
-        print(f"\n🔄 Baixando dados de {symbol}...")
+        print(f"\nBaixando dados de {symbol}...")
 
         try:
             df = yf.download(
@@ -83,7 +83,7 @@ class DataLoader:
             if df.empty:
                 raise ValueError(f"Nenhum dado foi baixado para {symbol}")
 
-            print(f"✓ {len(df)} registros baixados de {symbol}")
+            print(f"OK: {len(df)} registros baixados de {symbol}")
             print(f"  Período real: {df.index[0].date()} a {df.index[-1].date()}")
             print(f"  Colunas: {list(df.columns)}")
 
@@ -106,7 +106,7 @@ class DataLoader:
         Raises:
             ValueError: Se os dados forem inválidos
         """
-        print(f"\n🔍 Validando {name}...")
+        print(f"\nValidando {name}...")
 
         # Verificar se está vazio
         if df.empty:
@@ -115,7 +115,7 @@ class DataLoader:
         # Verificar valores nulos
         null_counts = df.isnull().sum()
         if null_counts.any():
-            print(f"⚠️  Valores nulos encontrados em {name}:")
+            print(f"AVISO: Valores nulos encontrados em {name}:")
             for col, count in null_counts[null_counts > 0].items():
                 print(f"     {col}: {count} ({count/len(df)*100:.2f}%)")
 
@@ -129,21 +129,21 @@ class DataLoader:
             # ✅ CORREÇÃO: Garantir que neg_volume seja um número (não Series)
             neg_volume = int((df['Volume'] < 0).sum())
             if neg_volume > 0:
-                print(f"⚠️  {neg_volume} valores negativos em Volume (corrigindo para 0)")
+                print(f"AVISO: {neg_volume} valores negativos em Volume (corrigindo para 0)")
                 df.loc[df['Volume'] < 0, 'Volume'] = 0
 
         # Verificar ordem temporal
         if not df.index.is_monotonic_increasing:
-            print("⚠️  Dados fora de ordem temporal (reordenando)")
+            print("AVISO: Dados fora de ordem temporal (reordenando)")
             df = df.sort_index()
 
         # Verificar duplicatas de índice
         duplicates = df.index.duplicated().sum()
         if duplicates > 0:
-            print(f"⚠️  {duplicates} índices duplicados (removendo)")
+            print(f"AVISO: {duplicates} indices duplicados (removendo)")
             df = df[~df.index.duplicated(keep='first')]
 
-        print(f"✓ {name} validado: {len(df)} registros válidos")
+        print(f"OK: {name} validado: {len(df)} registros validos")
 
         return df
 
@@ -188,7 +188,7 @@ class DataLoader:
             return df_vix
 
         except Exception as e:
-            print(f"⚠️  Erro ao carregar VIX: {e}")
+            print(f"AVISO: Erro ao carregar VIX: {e}")
             print("   Continuando sem dados do VIX...")
             return None
 
@@ -200,7 +200,7 @@ class DataLoader:
             Tupla (dados_principais, dados_vix)
         """
         print("\n" + "="*60)
-        print("📊 INICIANDO COLETA DE DADOS")
+        print("INICIANDO COLETA DE DADOS")
         print("="*60)
 
         # Carregar dados principais
@@ -210,7 +210,7 @@ class DataLoader:
         df_vix = self.load_vix_data()
 
         print("\n" + "="*60)
-        print("✅ COLETA DE DADOS CONCLUÍDA")
+        print("OK: COLETA DE DADOS CONCLUIDA")
         print("="*60)
         print(f"Total de registros: {len(df_main)}")
         print(f"Período: {df_main.index[0].date()} a {df_main.index[-1].date()}")
@@ -237,13 +237,13 @@ class DataLoader:
         # Salvar dados principais
         main_path = Path(output_dir) / f"{self.symbol.replace('^', '')}_raw.csv"
         df_main.to_csv(main_path)
-        print(f"\n💾 Dados principais salvos em: {main_path}")
+        print(f"\nDados principais salvos em: {main_path}")
 
         # Salvar VIX se disponível
         if df_vix is not None:
             vix_path = Path(output_dir) / "VIX_raw.csv"
             df_vix.to_csv(vix_path)
-            print(f"💾 Dados VIX salvos em: {vix_path}")
+            print(f"Dados VIX salvos em: {vix_path}")
 
     @staticmethod
     def load_from_csv(
@@ -266,14 +266,14 @@ class DataLoader:
             raise FileNotFoundError(f"Arquivo não encontrado: {main_path}")
 
         df_main = pd.read_csv(main_path, index_col=0, parse_dates=True)
-        print(f"📂 Dados principais carregados de: {main_path}")
+        print(f"Dados principais carregados de: {main_path}")
 
         # Carregar VIX se disponível
         vix_path = Path(output_dir) / "VIX_raw.csv"
         df_vix = None
         if vix_path.exists():
             df_vix = pd.read_csv(vix_path, index_col=0, parse_dates=True)
-            print(f"📂 Dados VIX carregados de: {vix_path}")
+            print(f"Dados VIX carregados de: {vix_path}")
 
         return df_main, df_vix
 
@@ -297,7 +297,7 @@ if __name__ == "__main__":
     df_main, df_vix = loader.load_all_data()
 
     # Exibir informações
-    print("\n📊 Informações dos dados principais:")
+    print("\nInformacoes dos dados principais:")
     print(df_main.info())
     print("\n📈 Primeiras linhas:")
     print(df_main.head())
@@ -305,7 +305,7 @@ if __name__ == "__main__":
     print(df_main.tail())
 
     if df_vix is not None:
-        print("\n📊 Informações do VIX:")
+        print("\nInformacoes do VIX:")
         print(df_vix.info())
         print("\n📈 Primeiras linhas do VIX:")
         print(df_vix.head())
@@ -313,4 +313,4 @@ if __name__ == "__main__":
     # Salvar dados brutos
     loader.save_raw_data(df_main, df_vix)
 
-    print("\n✅ Teste concluído com sucesso!")
+    print("\nOK: Teste concluido com sucesso!")

@@ -89,8 +89,12 @@ class PredictionResponse(BaseModel):
     prediction: float = Field(..., description="Preço predito para o próximo dia")
     confidence_lower: Optional[float] = Field(None, description="Limite inferior do intervalo de confiança (95%)")
     confidence_upper: Optional[float] = Field(None, description="Limite superior do intervalo de confiança (95%)")
+    direction: str = Field(..., description="Direção prevista: 'up', 'down' ou 'sideways'")
+    predicted_return: float = Field(..., description="Return predito (retorno percentual)")
+    prediction_id: Optional[str] = Field(None, description="ID único da predição (para validação posterior)")
     model_version: str = Field(..., description="Versão do modelo")
     timestamp: str = Field(..., description="Timestamp da predição")
+    inference_time_ms: Optional[float] = Field(None, description="Tempo de inferência em milissegundos")
 
     class Config:
         schema_extra = {
@@ -98,8 +102,11 @@ class PredictionResponse(BaseModel):
                 "prediction": 5745.32,
                 "confidence_lower": 5720.15,
                 "confidence_upper": 5770.50,
+                "direction": "up",
+                "predicted_return": 0.0015,
                 "model_version": "1.0.0",
-                "timestamp": "2024-11-16T10:30:00Z"
+                "timestamp": "2024-11-16T10:30:00Z",
+                "inference_time_ms": 45.2
             }
         }
 

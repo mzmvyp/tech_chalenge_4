@@ -282,7 +282,7 @@ def add_all_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     
     indicator_keywords = ['RSI', 'MACD', 'BB', 'Stochastic', 'ATR', 'ADX', 'DI']
     n_indicators = len([c for c in df.columns if any(keyword in c for keyword in indicator_keywords)])
-    print(f"   ✓ {n_indicators} indicadores adicionados")
+    print(f"   OK: {n_indicators} indicadores adicionados")
     
     return df
 

@@ -25,7 +25,7 @@ try:
     HAS_PATTERNS = True
 except ImportError:
     HAS_PATTERNS = False
-    print("⚠️  Módulos de padrões de candles e indicadores não encontrados")
+    print("AVISO: Modulos de padroes de candles e indicadores nao encontrados")
 
 
 def create_stationary_features(
@@ -59,7 +59,7 @@ def create_stationary_features(
         print("   Detectando padroes de candles...")
         df = detect_candlestick_patterns(df)
         df = detect_multi_candle_patterns(df, lookback=3)
-        print(f"   ✓ Padroes de candles adicionados")
+        print(f"   OK: Padroes de candles adicionados")
     
     if use_technical_indicators and HAS_PATTERNS:
         df = add_all_technical_indicators(df)
@@ -194,7 +194,7 @@ def create_stationary_features(
     removed = initial_len - len(df)
     
     if removed > 0:
-        print(f"⚠️  Removidas {removed} linhas com NaN após feature engineering")
+        print(f"AVISO: Removidas {removed} linhas com NaN apos feature engineering")
     
     # IMPORTANTE: O índice é preservado automaticamente pelo dropna()
     # Isso permite alinhamento correto com close_series depois
