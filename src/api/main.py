@@ -14,7 +14,7 @@ Autor: Tech Challenge - Fase 04
 Data: 2024-11-16
 """
 
-from fastapi import FastAPI, HTTPException, status, Body
+from fastapi import FastAPI, HTTPException, status, Body, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import numpy as np
@@ -56,6 +56,7 @@ from src.models.predictor import StockPredictor
 from src.data.preprocessor import TimeSeriesPreprocessor
 from src.data.feature_engineering_stationary import create_stationary_features
 from src.data.feature_selector import FeatureSelector
+from src.data.data_loader import DataLoader
 from src.monitoring.metrics import ModelMonitor
 from src.api.prediction_storage import PredictionStorage
 import uuid
