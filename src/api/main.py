@@ -33,7 +33,8 @@ from .schemas import (
     ModelInfo,
     HealthResponse,
     ErrorResponse,
-    StockDataPoint
+    StockDataPoint,
+    SimplePredictionRequest
 )
 
 # Imports dos módulos do projeto
@@ -682,4 +683,211 @@ async def validate_by_date(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao validar por data: {str(e)}"
+        )
+
+
+@app.post("/predict/simple", response_model=PredictionResponse, tags=["Prediction"])
+async def predict_simple(request: SimplePredictionRequest):
+    """
+    Faz uma predição de forma SIMPLIFICADA - apenas forneça o símbolo da ação.
+    
+    A API busca os dados históricos automaticamente via yfinance.
+    Muito mais fácil de usar que o endpoint /predict tradicional!
+    
+    Exemplo:
+    {
+      "symbol": "^GSPC",
+      "days": 200
+    }
+    """
+    if not api_state.model_loaded:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Modelo nao esta carregado"
+        )
+    
+    import time
+    start_time = time.time()
+    
+    try:
+        # Buscar dados automaticamente
+        from datetime import timedelta
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=request.days + 30)
+        
+        loader = DataLoader(
+            symbol=request.symbol,
+            start_date=start_date.strftime("%Y-%m-%d"),
+            end_date=end_date.strftime("%Y-%m-%d"),
+            interval="1d",
+            vix_symbol="^VIX" if request.symbol != "^VIX" else None
+        )
+        
+        df_main, df_vix = loader.load_all_data()
+        
+        if len(df_main) < api_state.min_required_days:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Dados insuficientes para {request.symbol}. Recebidos: {len(df_main)} dias, minimo: {api_state.min_required_days}"
+            )
+        
+        # Converter para formato da API
+        data_points = []
+        for date, row in df_main.iterrows():
+            data_points.append({
+                "date": date.strftime("%Y-%m-%d"),
+                "open": float(row['Open']),
+                "high": float(row['High']),
+                "low": float(row['Low']),
+                "close": float(row['Close']),
+                "volume": float(row['Volume'])
+            })
+        
+        # Criar DataFrame
+        df = pd.DataFrame(data_points)
+        df['date'] = pd.to_datetime(df['date'])
+        df = df.set_index('date').sort_index()
+        df = df.rename(columns={
+            'open': 'Open',
+            'high': 'High',
+            'low': 'Low',
+            'close': 'Close',
+            'volume': 'Volume'
+        })
+        
+        # Criar VIX
+        df_vix_api = None
+        if api_state.feature_config.get('use_vix', False):
+            if df_vix is not None and len(df_vix) > 0:
+                vix_series = df_vix.iloc[:, 0] if isinstance(df_vix.columns, pd.MultiIndex) else df_vix['Close']
+                df_vix_api = pd.DataFrame({
+                    'Open': vix_series,
+                    'High': vix_series * 1.1,
+                    'Low': vix_series * 0.9,
+                    'Close': vix_series,
+                    'Volume': [1000000] * len(vix_series)
+                }, index=df_vix.index)
+            else:
+                vix_value = 20.0
+                df_vix_api = pd.DataFrame({
+                    'Open': [vix_value] * len(df),
+                    'High': [vix_value * 1.1] * len(df),
+                    'Low': [vix_value * 0.9] * len(df),
+                    'Close': [vix_value] * len(df),
+                    'Volume': [1000000] * len(df)
+                }, index=df.index)
+        
+        # Criar features
+        df_features = create_stationary_features(df, df_vix_api)
+        selector = FeatureSelector(correlation_threshold=0.8)
+        df_features = selector.select_features(df_features, verbose=False)
+        
+        sequence_length = api_state.feature_config.get('sequence_length', 60)
+        if len(df_features) < sequence_length:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Apos criar features, apenas {len(df_features)} dias disponiveis. Minimo: {sequence_length}"
+            )
+        
+        # Usar features do scaler
+        if api_state.predictor.feature_names:
+            expected_features = api_state.predictor.feature_names
+        elif hasattr(api_state.predictor.scaler, 'feature_names_in_'):
+            expected_features = list(api_state.predictor.scaler.feature_names_in_)
+        else:
+            expected_features = api_state.feature_config.get('features', [])
+            if not expected_features:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Nao foi possivel determinar features esperadas."
+                )
+        
+        # Ajustar features
+        if len(df_features.columns) != len(expected_features):
+            missing_features = set(expected_features) - set(df_features.columns)
+            extra_features = set(df_features.columns) - set(expected_features)
+            
+            if missing_features:
+                for feat in missing_features:
+                    if feat == 'VIX' or 'VIX' in feat:
+                        df_features[feat] = 20.0
+                    else:
+                        df_features[feat] = 0.0
+            
+            if extra_features:
+                df_features = df_features.drop(columns=list(extra_features))
+        
+        df_features = df_features[expected_features]
+        
+        # Normalizar e predizer
+        data_scaled = api_state.predictor.scaler.transform(df_features.values)
+        sequence = data_scaled[-sequence_length:]
+        
+        prediction_return = api_state.predictor.predict_single(sequence, return_scaled=False)
+        last_close = float(df['Close'].iloc[-1])
+        prediction_close = last_close * (1 + prediction_return)
+        
+        # Calcular direção
+        if prediction_return > 0:
+            direction = "up"
+        elif prediction_return < 0:
+            direction = "down"
+        else:
+            direction = "sideways"
+        
+        # Intervalo de confiança
+        if 'Return' in df_features.columns:
+            recent_volatility = df_features['Return'].tail(30).std() * np.sqrt(1)
+        else:
+            recent_volatility = 0.01
+        
+        confidence_interval = float(prediction_close) * recent_volatility * 1.96
+        
+        # Salvar predição
+        prediction_id = str(uuid.uuid4())
+        prediction_timestamp = datetime.utcnow()
+        
+        api_state.prediction_storage.save_prediction(
+            prediction_id=prediction_id,
+            timestamp=prediction_timestamp,
+            predicted_price=float(prediction_close),
+            predicted_return=float(prediction_return),
+            direction=direction,
+            confidence_lower=float(prediction_close - confidence_interval),
+            confidence_upper=float(prediction_close + confidence_interval),
+            metadata={
+                "model_version": "1.0.0",
+                "symbol": request.symbol,
+                "inference_time_ms": float((time.time() - start_time) * 1000)
+            }
+        )
+        
+        # Monitoramento
+        inference_time = time.time() - start_time
+        if api_state.monitor:
+            api_state.monitor.log_prediction(
+                input_shape=sequence.shape,
+                prediction=float(prediction_close),
+                inference_time=inference_time,
+                timestamp=prediction_timestamp
+            )
+        
+        return PredictionResponse(
+            prediction=float(prediction_close),
+            confidence_lower=float(prediction_close - confidence_interval),
+            confidence_upper=float(prediction_close + confidence_interval),
+            direction=direction,
+            predicted_return=float(prediction_return),
+            prediction_id=prediction_id,
+            model_version="1.0.0",
+            timestamp=prediction_timestamp.isoformat() + "Z",
+            inference_time_ms=float((time.time() - start_time) * 1000)
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Erro ao processar predicao simplificada: {str(e)}"
         )

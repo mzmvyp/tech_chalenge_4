@@ -9,24 +9,29 @@ Sistema completo de predição de preços de ações usando LSTM com features es
 - ✅ **Arquitetura Otimizada**: LSTM com BatchNormalization e dropout balanceado
 - ✅ **47 Features**: Returns, VIX, padrões de candles, indicadores técnicos (RSI, MACD, Bollinger Bands, etc.)
 - ✅ **Sequence Length**: 60 períodos históricos
+- ✅ **Modelo Genérico**: Funciona para qualquer ação (não apenas S&P 500), embora tenha sido treinado com S&P 500
 
 ### Sistemas de Aprendizado
 - ✅ **Error-Focused Learning**: Aprende especificamente dos erros, focando em casos difíceis
 - ✅ **Aprendizado Imediato**: Aprende instantaneamente de erros grandes durante predições
 - ✅ **Aprendizado em Batch**: Retreina periodicamente com buffer de erros acumulados
 - ✅ **Retreinamento Periódico**: Sistema automático de retreinamento incremental diário
+- ✅ **Preservação de Aprendizado**: Modelo aprendido de erros é preservado no retreinamento
 
 ### Predição e Validação
 - ✅ **Ensemble Learning**: Combina múltiplos modelos para maior robustez
 - ✅ **Adaptive Threshold**: Threshold dinâmico para predição de direção baseado em volatilidade
 - ✅ **Direction Accuracy**: Métrica para avaliar acerto de direção (alta/baixa)
 - ✅ **Anti-Data Leakage**: Proteções rigorosas contra vazamento de dados
+- ✅ **Armazenamento de Predições**: Sistema para salvar predições e validá-las posteriormente
+- ✅ **Validação Automática**: Endpoints para validar predições com valores reais
 
 ### Produção
 - ✅ **API REST**: FastAPI para servir predições em produção
+- ✅ **Endpoint Simplificado**: `/predict/simple` aceita apenas símbolo e número de dias
 - ✅ **Docker**: Containerização para deploy fácil
 - ✅ **Monitoramento**: Logs e histórico de performance
-- ✅ **Preservação de Aprendizado**: Modelo aprendido de erros é preservado no retreinamento
+- ✅ **Health Checks**: Verificação automática de saúde da API
 
 ## 📊 Resultados Atuais
 
@@ -98,6 +103,13 @@ python scripts/run_api.py
 docker-compose up
 ```
 
+### 6. Processar Erros Diários
+
+```bash
+# Processar predições não validadas e aprender dos erros
+python scripts/learn_from_daily_errors.py
+```
+
 ## 📁 Estrutura do Projeto
 
 ```
@@ -108,6 +120,7 @@ docker-compose up
 │   ├── setup_retrain_scheduler.py         # Configurar agendamento
 │   ├── run_api.py                         # Executar API FastAPI
 │   ├── test_api.py                        # Testar endpoints da API
+│   ├── learn_from_daily_errors.py         # Processar erros diários
 │   ├── evaluate_model.py                  # Avaliação do modelo
 │   └── retrain_daily.bat                  # Script de agendamento (Windows)
 │
@@ -116,7 +129,9 @@ docker-compose up
 │   │   ├── data_loader.py                 # Coleta de dados do Yahoo Finance
 │   │   ├── feature_engineering_stationary.py  # Features estacionárias
 │   │   ├── technical_indicators.py        # Indicadores técnicos
-│   │   └── candlestick_patterns.py       # Padrões de candles
+│   │   ├── candlestick_patterns.py       # Padrões de candles
+│   │   ├── feature_selector.py           # Seleção de features
+│   │   └── preprocessor.py               # Preprocessamento temporal
 │   │
 │   ├── models/
 │   │   ├── lstm_model.py                  # Arquitetura LSTM
@@ -125,7 +140,10 @@ docker-compose up
 │   │   └── predictor.py                   # Interface de predição
 │   │
 │   ├── api/
-│   │   └── main.py                        # API FastAPI
+│   │   ├── main.py                        # API FastAPI
+│   │   ├── schemas.py                     # Schemas Pydantic
+│   │   ├── prediction_storage.py          # Armazenamento de predições
+│   │   └── state.py                       # Estado da API
 │   │
 │   ├── evaluation/
 │   │   └── metrics.py                     # Métricas de avaliação
@@ -142,12 +160,16 @@ docker-compose up
 ├── outputs/
 │   ├── backtest_error_learning_results.json
 │   ├── backtest_error_learning_predictions.csv
-│   └── backtest_history.json              # Histórico de backtests
+│   ├── backtest_history.json              # Histórico de backtests
+│   └── predictions/                       # Predições armazenadas
+│
+├── docker/
+│   └── Dockerfile                         # Container Docker
 │
 ├── config.yaml                            # Configurações do projeto
 ├── requirements.txt                        # Dependências Python
-├── Dockerfile                             # Container Docker
-└── docker-compose.yml                     # Orquestração Docker
+├── docker-compose.yml                     # Orquestração Docker
+└── .dockerignore                          # Arquivos ignorados no Docker
 ```
 
 ## 🔄 Fluxo de Produção Automático
@@ -178,12 +200,18 @@ docker-compose up
 1. PREDIÇÕES
    ├─> API recebe requisições
    ├─> Modelo faz predições
+   ├─> Armazena predições com ID único
    └─> Retorna preço e direção previstos
 
-2. ERROR LEARNING (se habilitado)
-   ├─> Detecta erros grandes
-   ├─> Aprende imediatamente
-   └─> Melhora performance ao longo do tempo
+2. VALIDAÇÃO (Fim do dia)
+   ├─> Usuário valida predições com valores reais
+   ├─> Sistema identifica erros
+   └─> Erros são armazenados para aprendizado
+
+3. APRENDIZADO DE ERROS (Diário)
+   ├─> Script processa predições validadas
+   ├─> Identifica erros grandes
+   └─> Retreina modelo com foco nos erros
 ```
 
 ## 🎯 Sistemas de Aprendizado
@@ -226,6 +254,32 @@ python scripts/setup_retrain_scheduler.py --platform windows
 python scripts/periodic_retrain.py --mode incremental --run-backtest
 ```
 
+### Armazenamento e Validação de Predições
+
+Sistema para rastrear e validar predições:
+
+- **Armazenamento Automático**: Todas as predições são salvas com ID único
+- **Validação por ID**: Valide uma predição específica usando seu ID
+- **Validação por Data**: Valide todas as predições de uma data específica
+- **Aprendizado Automático**: Erros validados são usados para retreinar o modelo
+
+**Uso:**
+```bash
+# Validar predição por ID
+POST /validate-prediction
+{
+  "prediction_id": "uuid-da-predicao",
+  "actual_price": 4650.0
+}
+
+# Validar predições por data
+POST /validate-by-date
+{
+  "target_date": "2025-11-27",
+  "actual_price": 4650.0
+}
+```
+
 ## 🔧 Configuração
 
 ### Arquivo `config.yaml`
@@ -234,7 +288,7 @@ Principais configurações:
 
 ```yaml
 data:
-  symbol: "^GSPC"              # S&P 500
+  symbol: "^GSPC"              # S&P 500 (treinamento)
   vix_symbol: "^VIX"           # Volatilidade
   start_date: "2019-01-01"
   end_date: "2024-11-01"
@@ -249,6 +303,8 @@ training:
   epochs: 100
   early_stopping: {...}
 ```
+
+**Nota**: O modelo foi treinado com S&P 500, mas pode ser usado para outras ações. As features são genéricas (Returns, Volatility, Momentum, Volume, indicadores técnicos) e funcionam para qualquer ação. Para melhor performance, recomenda-se retreinar o modelo para cada ação específica.
 
 ### Parâmetros de Error Learning
 
@@ -266,7 +322,23 @@ Configuráveis no código:
 GET /health
 ```
 
-**Predição Única:**
+**Informações do Modelo:**
+```bash
+GET /model/info
+```
+
+**Predição Simplificada (Recomendado):**
+```bash
+POST /predict/simple
+Content-Type: application/json
+
+{
+  "symbol": "AAPL",      # Qualquer símbolo do Yahoo Finance
+  "days": 200            # Número de dias de histórico
+}
+```
+
+**Predição Única (Avançado):**
 ```bash
 POST /predict
 Content-Type: application/json
@@ -288,39 +360,209 @@ Content-Type: application/json
 }
 ```
 
+**Validar Predição (por ID):**
+```bash
+POST /validate-prediction
+Content-Type: application/json
+
+{
+  "prediction_id": "uuid-da-predicao",
+  "actual_price": 4650.0
+}
+```
+
+**Validar Predições (por Data):**
+```bash
+POST /validate-by-date
+Content-Type: application/json
+
+{
+  "target_date": "2025-11-27",
+  "actual_price": 4650.0
+}
+```
+
+**Estatísticas de Monitoramento:**
+```bash
+GET /monitoring/stats
+```
+
+### Resposta da Predição
+
+```json
+{
+  "prediction_close": 4650.25,
+  "direction": "up",
+  "predicted_return": 0.0012,
+  "prediction_id": "uuid-único",
+  "inference_time_ms": 45.2,
+  "confidence_interval": {
+    "lower": 4600.0,
+    "upper": 4700.0
+  }
+}
+```
+
 ### Testar API
 
 ```bash
 # Testar endpoints
 python scripts/test_api.py
 
-# Ou manualmente
-curl -X POST http://localhost:8000/predict \
+# Ou manualmente via curl
+curl -X POST http://localhost:8000/predict/simple \
   -H "Content-Type: application/json" \
-  -d '{"sequence": [...], "last_close": 4500.0}'
+  -d '{"symbol": "AAPL", "days": 200}'
+
+# Ou acesse a documentação interativa
+# http://localhost:8000/docs
 ```
 
 ## 🐳 Docker
 
-### Build e Run
+### Pré-requisitos
+
+- Docker instalado
+- Docker Compose instalado (ou Docker Desktop que inclui Compose)
+- Modelo treinado (arquivos em `models/`)
+
+### Deploy Local
+
+#### 1. Verificar se o modelo está treinado
 
 ```bash
-# Build
-docker build -t lstm-stock-prediction .
-
-# Run
-docker run -p 8000:8000 lstm-stock-prediction
-
-# Ou com docker-compose
-docker-compose up
+# Verificar se os arquivos existem
+ls models/
+# Deve ter:
+# - lstm_model.h5
+# - scaler.pkl
+# - model_info.json
 ```
 
-### Docker Compose
+Se não tiver, treine primeiro:
+```bash
+python scripts/train_model_stationary.py
+```
 
-O `docker-compose.yml` inclui:
-- API FastAPI
-- Volumes para modelos e dados
-- Configuração de rede
+#### 2. Construir a imagem Docker
+
+```bash
+docker-compose build
+```
+
+Ou manualmente:
+```bash
+docker build -t lstm-stock-api -f docker/Dockerfile .
+```
+
+#### 3. Iniciar o container
+
+```bash
+docker-compose up -d
+```
+
+Ou manualmente:
+```bash
+docker run -d \
+  --name lstm_stock_api \
+  -p 8000:8000 \
+  -v $(pwd)/models:/app/models \
+  -v $(pwd)/logs:/app/logs \
+  -v $(pwd)/outputs:/app/outputs \
+  -v $(pwd)/data:/app/data \
+  lstm-stock-api
+```
+
+#### 4. Verificar se está rodando
+
+```bash
+# Ver logs
+docker-compose logs -f api
+
+# Ou
+docker logs -f lstm_stock_api
+
+# Verificar health
+curl http://localhost:8000/health
+```
+
+#### 5. Parar o container
+
+```bash
+docker-compose down
+```
+
+Ou:
+```bash
+docker stop lstm_stock_api
+docker rm lstm_stock_api
+```
+
+### Deploy em Nuvem
+
+#### Heroku
+
+1. Criar `Procfile`:
+   ```
+   web: python scripts/run_api.py --host 0.0.0.0 --port $PORT
+   ```
+
+2. Criar `heroku.yml`:
+   ```yaml
+   build:
+     docker:
+       web: docker/Dockerfile
+   ```
+
+3. Deploy:
+   ```bash
+   heroku create
+   heroku container:push web
+   heroku container:release web
+   ```
+
+#### Railway
+
+1. Conectar repositório GitHub
+2. Railway detecta `docker-compose.yml` automaticamente
+3. Configurar variáveis de ambiente se necessário
+4. Deploy automático
+
+#### Render
+
+1. Criar novo Web Service
+2. Conectar repositório
+3. Usar Docker como ambiente
+4. Configurar:
+   - Build Command: `docker build -t api -f docker/Dockerfile .`
+   - Start Command: `docker run -p 8000:8000 api`
+
+#### AWS (EC2/ECS)
+
+1. **EC2**: SSH e rodar docker-compose
+2. **ECS**: Criar task definition com Dockerfile
+3. **Elastic Beanstalk**: Usar Docker platform
+
+### Troubleshooting Docker
+
+**Erro: "Modelo não encontrado"**
+- Verifique se os arquivos estão em `models/`
+- Verifique se o volume está montado corretamente
+
+**Erro: "Porta 8000 já em uso"**
+- Pare outros serviços na porta 8000
+- Ou mude a porta no `docker-compose.yml`:
+  ```yaml
+  ports:
+    - "8001:8000"  # Usar porta 8001 no host
+  ```
+
+**Erro: "Cannot connect to Docker daemon"**
+- Inicie o Docker Desktop
+- Ou inicie o serviço Docker:
+  ```bash
+  sudo systemctl start docker  # Linux
+  ```
 
 ## 📈 Métricas e Avaliação
 
@@ -366,6 +608,16 @@ Input: (60, 47)
 - **Adaptive Threshold**: Ajusta threshold baseado em volatilidade recente
 - **Confidence Threshold**: Filtra predições de baixa confiança
 
+### Compatibilidade com Múltiplas Ações
+
+O modelo foi treinado com S&P 500 (`^GSPC`), mas pode ser usado para outras ações porque:
+
+- **Features Genéricas**: Returns, Volatility, Momentum, Volume, indicadores técnicos funcionam para qualquer ação
+- **VIX Opcional**: Se não disponível, o sistema usa um valor simulado
+- **Endpoint Simplificado**: `/predict/simple` aceita qualquer símbolo do Yahoo Finance
+
+**Recomendação**: Para melhor performance, retreine o modelo para cada ação específica usando `scripts/train_model_stationary.py` com o símbolo desejado.
+
 ## 🛠️ Requisitos
 
 - Python 3.10+
@@ -387,10 +639,13 @@ pip install -r requirements.txt
 3. **Windows Compatibility**: Todos os emojis foram removidos para compatibilidade com Windows
 4. **Data Leakage**: Sistema tem proteções rigorosas contra vazamento de dados
 5. **Temporal Split**: Dados são divididos temporalmente (sem shuffle) para simular produção
+6. **Modelo Genérico**: Funciona para qualquer ação, mas foi otimizado para S&P 500
 
 ## 🎓 Tech Challenge - Requisitos
 
 Este projeto atende aos requisitos do Tech Challenge Fase 4:
+
+### Requisitos Obrigatórios ✅
 
 - ✅ **Coleta e Pré-processamento**: yfinance, feature engineering completo
 - ✅ **Modelo LSTM**: Arquitetura otimizada com múltiplas camadas
@@ -401,12 +656,52 @@ Este projeto atende aos requisitos do Tech Challenge Fase 4:
 - ✅ **Monitoramento**: Logs e histórico de performance
 - ✅ **Retreinamento Automático**: Sistema periódico implementado
 
+### Funcionalidades Extras (Bônus) ✅
+
+- ✅ **Error-Focused Learning**: Sistema de aprendizado focado em erros
+- ✅ **Armazenamento e Validação**: Sistema completo de rastreamento de predições
+- ✅ **Endpoint Simplificado**: `/predict/simple` para facilitar uso
+- ✅ **Ensemble Learning**: Combinação de múltiplos modelos
+- ✅ **Adaptive Threshold**: Threshold dinâmico para direção
+- ✅ **Anti-Data Leakage**: Proteções rigorosas contra vazamento
+- ✅ **Feature Selection**: Redução de multicolinearidade
+
+### Entregáveis
+
+- ✅ **Código-fonte**: Repositório Git completo com documentação
+- ✅ **Docker**: Scripts e contêineres para deploy
+- ⚠️ **Link para API em produção**: Opcional (pode ser feito localmente ou em nuvem)
+- ⚠️ **Vídeo demonstrativo**: Obrigatório (precisa ser gravado pelo aluno)
+
+## 🚨 Próximos Passos
+
+### Para Completar o Tech Challenge
+
+1. **Testar tudo localmente** ✅
+   ```bash
+   python scripts/test_api.py
+   ```
+
+2. **Fazer deploy em nuvem** (opcional, mas recomendado)
+   - Heroku: `git push heroku main`
+   - Railway: Conectar repositório
+   - Render: Deploy automático
+
+3. **Gravar vídeo demonstrativo** (obrigatório)
+   - Mostrar treinamento do modelo
+   - Mostrar API funcionando
+   - Mostrar predições com diferentes ações
+   - Mostrar validação de predições
+   - Mostrar aprendizado de erros
+   - Mostrar métricas e resultados
+
 ## 📞 Suporte
 
 Para dúvidas ou problemas:
 1. Verifique os logs em `logs/`
 2. Consulte os resultados em `outputs/`
 3. Teste a API com `python scripts/test_api.py`
+4. Verifique a documentação da API em `http://localhost:8000/docs`
 
 ---
 

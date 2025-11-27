@@ -34,9 +34,9 @@ EXPOSE 8000
 ENV PYTHONUNBUFFERED=1
 ENV TF_CPP_MIN_LOG_LEVEL=2
 
-# Health check
+# Health check (usar curl ou wget que já vem na imagem)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
 # Comando para iniciar a API
 CMD ["python", "scripts/run_api.py"]

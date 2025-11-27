@@ -206,3 +206,20 @@ class ErrorResponse(BaseModel):
                 "timestamp": "2024-11-16T10:30:00Z"
             }
         }
+
+
+class SimplePredictionRequest(BaseModel):
+    """
+    Modelo simplificado para predição - apenas símbolo da ação.
+    A API busca os dados automaticamente.
+    """
+    symbol: str = Field(..., description="Símbolo da ação (ex: ^GSPC, AAPL, MSFT)")
+    days: Optional[int] = Field(200, description="Número de dias históricos a buscar (padrão: 200)", ge=60)
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "symbol": "^GSPC",
+                "days": 200
+            }
+        }
